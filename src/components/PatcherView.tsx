@@ -1,6 +1,7 @@
 import React from "react";
 import type { Rule, RuleTemplate } from "../game/gameTypes";
-import { ActiveRulesPanel} from "./activeRulesPanel";
+import { ActiveRulesPanel } from "./ActiveRulesPanel";
+
 
 type PatcherViewProps = {
   mode: "patcher";

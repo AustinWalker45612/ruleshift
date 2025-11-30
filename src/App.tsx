@@ -222,10 +222,6 @@ const App: React.FC = () => {
     };
   }, [isEndgameWindow, prevValidCodesCount, currentValidCount]);
 
-  const computedEndgameAttempts = endgameStats
-    ? endgameStats.totalAttempts
-    : 0;
-
   // ---------- SOCKET BROADCAST HELPER ----------
   const broadcastState = (overrides: Partial<SyncedState> = {}) => {
     const payload: SyncedState = {

@@ -1,7 +1,7 @@
 import React from "react";
 import type { Rule, Player, Guess } from "../game/gameTypes";
 import { templateOptions } from "../game/ruleTemplates";
-import { ActiveRulesPanel} from "./activeRulesPanel";
+import { ActiveRulesPanel } from "./ActiveRulesPanel";
 
 type BreakerViewProps = {
   mode: "host" | "phone";

@@ -1,5 +1,5 @@
 import React from "react";
-import type { Rule, RuleTemplate } from "../game/gameTypes";
+import type { RuleTemplate } from "../game/gameTypes";
 
 type Option = { value: RuleTemplate; label: string };
 

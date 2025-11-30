@@ -29,7 +29,7 @@ type ResultScreensProps = {
 export const ResultScreens: React.FC<ResultScreensProps> = ({
   phase,
   lastGuessValue,
-  lastResult,
+  lastResult: _lastResult,
   patcherSecretCode,
   currentBreakerName,
   currentPatcherName,
