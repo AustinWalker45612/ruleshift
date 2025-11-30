@@ -286,6 +286,26 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // ---------- ON CONNECT / RECONNECT: REQUEST LATEST STATE ----------
+  useEffect(() => {
+    const requestState = () => {
+      console.log("🔄 Requesting latest game state from server...");
+      socket.emit("game:requestState");
+    };
+
+    // If we're already connected (page loaded after socket connected), request immediately
+    if (socket.connected) {
+      requestState();
+    }
+
+    // Also request whenever we (re)connect
+    socket.on("connect", requestState);
+
+    return () => {
+      socket.off("connect", requestState);
+    };
+  }, []);
+
   // ---------- LOCAL EFFECTS (NOT EMITTING) ----------
   useEffect(() => {
     if (phase === "patcherSetup") {
