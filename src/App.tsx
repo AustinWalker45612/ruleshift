@@ -79,6 +79,9 @@ type SyncedState = {
   lastPatcherPoints: number | null;
 
   sender?: string;
+
+  // When true, tells all clients to wipe their local-only UI state (full restart)
+  resetLocalFields?: boolean;
 };
 
 const App: React.FC = () => {
@@ -278,12 +281,24 @@ const App: React.FC = () => {
       setLastGuessValue(remote.lastGuessValue);
       setLastBreakerPoints(remote.lastBreakerPoints);
       setLastPatcherPoints(remote.lastPatcherPoints);
+
+      // If this payload represents a full duel restart,
+      // clear all local-only UI state on this device as well.
+      if (remote.resetLocalFields) {
+        resetRoundFields();
+        setEndgameModeActive(false);
+        setEndgameAttemptsLeft(0);
+        setEndgameBaseAttempts(0);
+        setEndgameBonusAttempts(0);
+        setPrevValidCodesCount(null);
+      }
     };
 
     socket.on("game:state", handler);
     return () => {
       socket.off("game:state", handler);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---------- ON CONNECT / RECONNECT: REQUEST LATEST STATE ----------
@@ -293,12 +308,10 @@ const App: React.FC = () => {
       socket.emit("game:requestState");
     };
 
-    // If we're already connected (page loaded after socket connected), request immediately
     if (socket.connected) {
       requestState();
     }
 
-    // Also request whenever we (re)connect
     socket.on("connect", requestState);
 
     return () => {
@@ -982,6 +995,7 @@ const App: React.FC = () => {
     setPrevValidCodesCount(null);
     setPhase("patcherSetup");
 
+    // This flag tells *all* clients to clear their local-only UI fields too
     broadcastState({
       phase: "patcherSetup",
       currentPatcherIndex: 0,
@@ -998,6 +1012,7 @@ const App: React.FC = () => {
       endgameBaseAttempts: 0,
       endgameBonusAttempts: 0,
       prevValidCodesCount: null,
+      resetLocalFields: true,
     });
   };
 
