@@ -938,14 +938,13 @@ const App: React.FC = () => {
       lastPatcherPoints: null,
     });
   };
-
   const handleRestartDuel = () => {
-    // Keep names, but force both players to re-confirm
-    const resetPlayers: Player[] = players.map((p) => ({
-      ...p,
-      ready: false,
-    }));
-
+    // Completely reset player names and readiness
+    const resetPlayers: Player[] = [
+      { name: "", ready: false },
+      { name: "", ready: false },
+    ];
+  
     setPlayers(resetPlayers);
     setRounds([]);
     setCurrentRoundNumber(1);
@@ -962,7 +961,7 @@ const App: React.FC = () => {
     setEndgameBonusAttempts(0);
     setPrevValidCodesCount(null);
     setPhase("enterNames");
-
+  
     broadcastState({
       players: resetPlayers,
       phase: "enterNames",
@@ -984,6 +983,7 @@ const App: React.FC = () => {
       prevValidCodesCount: null,
     });
   };
+  
 
   const currentPatcherName = currentPatcher.name || "?";
   const currentBreakerName = players[1 - currentPatcherIndex].name || "?";
