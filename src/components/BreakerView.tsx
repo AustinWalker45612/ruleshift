@@ -27,6 +27,9 @@ type BreakerViewProps = {
 
   visibleRules: Rule[];
   validCodesCount: number;
+
+  // NEW: if true, this is a spectator view (no input / no submit)
+  readOnly?: boolean;
 };
 
 export const BreakerView: React.FC<BreakerViewProps> = ({
@@ -46,12 +49,12 @@ export const BreakerView: React.FC<BreakerViewProps> = ({
   endgameBonusAttempts,
   endgameAttemptsLeft,
   validCodes,
-
   visibleRules,
   validCodesCount,
-
+  readOnly,
 }) => {
   const isPhone = mode === "phone";
+  const isReadOnly = !!readOnly;
 
   return (
     <div
@@ -62,10 +65,24 @@ export const BreakerView: React.FC<BreakerViewProps> = ({
         boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
       }}
     >
-      <h2 style={{ marginBottom: 8 }}>
+      <h2 style={{ marginBottom: 4, fontSize: 18 }}>
         {currentBreaker.name}&apos;s Turn (BREAKER)
-        {isPhone && " 📱"}
+        {!isReadOnly && isPhone && " 📱"}
       </h2>
+
+      {isReadOnly && (
+        <p
+          style={{
+            fontSize: 12,
+            marginBottom: 8,
+            opacity: 0.85,
+          }}
+        >
+          <strong>Spectator view:</strong> You&apos;re watching{" "}
+          <strong>{currentBreaker.name}</strong>&apos;s guesses in real time.
+        </p>
+      )}
+
       <ActiveRulesPanel
         visibleRules={visibleRules}
         validCodesCount={validCodesCount}
@@ -142,61 +159,66 @@ export const BreakerView: React.FC<BreakerViewProps> = ({
         </p>
       )}
 
-      <label style={{ display: "block", marginBottom: 8 }}>
-        Your Guess:
-        <input
-          style={{
-            width: "100%",
-            marginTop: 4,
-            padding: 8,
-            borderRadius: 8,
-            border: "1px solid #374151",
-            background: "#020617",
-            color: "#e5e7eb",
-            letterSpacing: 2,
-          }}
-          value={breakerGuess}
-          maxLength={4}
-          onChange={(e) => setBreakerGuess(e.target.value.toUpperCase())}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleAddGuess();
-            }
-          }}
-          placeholder="e.g. A1B2"
-        />
-      </label>
+      {/* INPUT + BUTTON HIDDEN IN READ-ONLY MODE */}
+      {!isReadOnly && (
+        <>
+          <label style={{ display: "block", marginBottom: 8 }}>
+            Your Guess:
+            <input
+              style={{
+                width: "100%",
+                marginTop: 4,
+                padding: 8,
+                borderRadius: 8,
+                border: "1px solid #374151",
+                background: "#020617",
+                color: "#e5e7eb",
+                letterSpacing: 2,
+              }}
+              value={breakerGuess}
+              maxLength={4}
+              onChange={(e) => setBreakerGuess(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddGuess();
+                }
+              }}
+              placeholder="e.g. A1B2"
+            />
+          </label>
 
-      {breakerError && (
-        <p
-          style={{
-            marginTop: 4,
-            marginBottom: 8,
-            fontSize: 12,
-            color: "#f97373",
-          }}
-        >
-          {breakerError}
-        </p>
+          {breakerError && (
+            <p
+              style={{
+                marginTop: 4,
+                marginBottom: 8,
+                fontSize: 12,
+                color: "#f97373",
+              }}
+            >
+              {breakerError}
+            </p>
+          )}
+
+          <button
+            onClick={handleAddGuess}
+            style={{
+              width: "100%",
+              padding: "10px 0",
+              borderRadius: 999,
+              border: "none",
+              fontWeight: 600,
+              cursor: "pointer",
+              background: "#16a34a",
+              color: "#e5e7eb",
+              marginBottom: 16,
+            }}
+          >
+            Submit Guess
+          </button>
+        </>
       )}
-
-      <button
-        onClick={handleAddGuess}
-        style={{
-          width: "100%",
-          padding: "10px 0",
-          borderRadius: 999,
-          border: "none",
-          fontWeight: 600,
-          cursor: "pointer",
-          background: "#16a34a",
-          color: "#e5e7eb",
-          marginBottom: 16,
-        }}
-      >
-        Submit Guess
-      </button>
 
       {currentRoundGuesses.length > 0 && (
         <div
