@@ -47,13 +47,8 @@ type Round = {
   guesses: Guess[];
 };
 
-// Which seat this browser is playing as (or none yet)
 type PlayerSeat = 0 | 1 | null;
 
-/**
- * Everything that BOTH devices should stay in sync on.
- * (Per-device-only things like playerSeat, breakerError, etc. stay local.)
- */
 type SyncedState = {
   players: Player[];
   phase: Phase;
@@ -79,13 +74,9 @@ type SyncedState = {
   lastPatcherPoints: number | null;
 
   sender?: string;
-
-  // When true, tells all clients to wipe their local-only UI state (full restart)
-  resetLocalFields?: boolean;
 };
 
 const App: React.FC = () => {
-  // Which seat this browser is controlling: Player 1 (0) or Player 2 (1)
   const [playerSeat, setPlayerSeat] = useState<PlayerSeat>(null);
 
   const [players, setPlayers] = useState<Player[]>([
@@ -107,7 +98,6 @@ const App: React.FC = () => {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [currentRoundGuesses, setCurrentRoundGuesses] = useState<Guess[]>([]);
 
-  // Per-player guess history across the duel (used in BreakerView)
   const [playerCorrectGuesses, setPlayerCorrectGuesses] = useState<string[][]>(
     [[], []]
   );
@@ -118,11 +108,10 @@ const App: React.FC = () => {
   const [rules, setRules] = useState<Rule[]>([]);
   const [nextRuleId, setNextRuleId] = useState(1);
 
-  // Template selection + parameters for the new rule
   const [selectedTemplate, setSelectedTemplate] =
     useState<RuleTemplate>("positionEquals");
 
-  const [positionIndex, setPositionIndex] = useState<number>(1); // 1–4 in UI
+  const [positionIndex, setPositionIndex] = useState<number>(1);
   const [positionChar, setPositionChar] = useState<string>("");
 
   const [positionKind, setPositionKind] = useState<"letter" | "digit">(
@@ -145,11 +134,9 @@ const App: React.FC = () => {
 
   const [distinctCount, setDistinctCount] = useState<number>(4);
 
-  // For result screens
   const [lastResult, setLastResult] = useState<GuessResult | null>(null);
   const [lastGuessValue, setLastGuessValue] = useState<string | null>(null);
 
-  // Score state
   const [playerScores, setPlayerScores] = useState<[number, number]>([0, 0]);
   const [lastBreakerPoints, setLastBreakerPoints] = useState<number | null>(
     null
@@ -158,13 +145,11 @@ const App: React.FC = () => {
     null
   );
 
-  // Endgame state (hard-enforced attempts)
   const [endgameModeActive, setEndgameModeActive] = useState(false);
   const [endgameAttemptsLeft, setEndgameAttemptsLeft] = useState(0);
   const [endgameBaseAttempts, setEndgameBaseAttempts] = useState(0);
   const [endgameBonusAttempts, setEndgameBonusAttempts] = useState(0);
 
-  // Previous valid-code count (before the latest rule that led into endgame)
   const [prevValidCodesCount, setPrevValidCodesCount] = useState<number | null>(
     null
   );
@@ -175,9 +160,8 @@ const App: React.FC = () => {
 
   const bothPlayersReady = players[0].ready && players[1].ready;
 
-  const TOTAL_CODES = 36 ** 4; // 1,679,616 possible 4-char codes
+  const TOTAL_CODES = 36 ** 4;
 
-  // ---------- GLOBAL VALID-CODE SPACE + ENDGAME POTENTIAL ----------
   const allPossibleCodes = useMemo(() => {
     const results: string[] = [];
     const build = (prefix: string, depth: number) => {
@@ -225,7 +209,6 @@ const App: React.FC = () => {
     };
   }, [isEndgameWindow, prevValidCodesCount, currentValidCount]);
 
-  // ---------- SOCKET BROADCAST HELPER ----------
   const broadcastState = (overrides: Partial<SyncedState> = {}) => {
     const payload: SyncedState = {
       players,
@@ -253,10 +236,8 @@ const App: React.FC = () => {
     socket.emit("game:state", payload);
   };
 
-  // ---------- SOCKET RECEIVE: APPLY REMOTE STATE ----------
   useEffect(() => {
     const handler = (remote: SyncedState) => {
-      // Ignore our own echo
       if (remote.sender && remote.sender === socket.id) return;
 
       setPlayers(remote.players);
@@ -281,27 +262,15 @@ const App: React.FC = () => {
       setLastGuessValue(remote.lastGuessValue);
       setLastBreakerPoints(remote.lastBreakerPoints);
       setLastPatcherPoints(remote.lastPatcherPoints);
-
-      // If this payload represents a full duel restart,
-      // clear all local-only UI state on this device as well.
-      if (remote.resetLocalFields) {
-        resetRoundFields();
-        setEndgameModeActive(false);
-        setEndgameAttemptsLeft(0);
-        setEndgameBaseAttempts(0);
-        setEndgameBonusAttempts(0);
-        setPrevValidCodesCount(null);
-      }
     };
 
     socket.on("game:state", handler);
     return () => {
       socket.off("game:state", handler);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---------- ON CONNECT / RECONNECT: REQUEST LATEST STATE ----------
+  // On connect / reconnect: ask server for latest state
   useEffect(() => {
     const requestState = () => {
       console.log("🔄 Requesting latest game state from server...");
@@ -319,7 +288,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // ---------- LOCAL EFFECTS (NOT EMITTING) ----------
   useEffect(() => {
     if (phase === "patcherSetup") {
       setPrevValidCodesCount(currentValidCount);
@@ -342,8 +310,6 @@ const App: React.FC = () => {
     }
   }, [phase, isEndgameWindow, endgameStats]);
 
-  // Visible rules in the UI:
-  // During breakerTurn we hide ONLY the newest rule.
   const visibleRules =
     phase === "breakerTurn"
       ? rules.slice(0, Math.max(0, rules.length - 1))
@@ -395,7 +361,6 @@ const App: React.FC = () => {
     setCurrentRoundNumber(1);
     setPhase("patcherSetup");
 
-    // Broadcast the fresh game start snapshot
     broadcastState({
       phase: "patcherSetup",
       currentPatcherIndex: 0,
@@ -756,17 +721,15 @@ const App: React.FC = () => {
       return;
     }
 
-    // Check against only the rules the Breaker can see (previously implemented)
     const passesVisibleRules = passesAllRules(guess, visibleRules);
 
     if (!passesVisibleRules) {
       setBreakerError("Breaks one of the previously implemented rules.");
-      return; // do NOT count it as an INVALID attempt, don't record guess
+      return;
     }
 
     const systemValid = passesAllRules(guess, rules);
 
-    // INVALID path
     if (!systemValid) {
       const newGuess: Guess = {
         value: guess,
@@ -845,7 +808,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // VALID or EXACT
     let result: GuessResult;
     if (guess === patcherSecretCode) {
       result = "EXACT";
@@ -926,7 +888,6 @@ const App: React.FC = () => {
         lastPatcherPoints: patcherPoints,
       });
     } else {
-      // EXACT
       if (endgameModeActive && isEndgameWindow) {
         setPhase("breakerWin");
         broadcastState({
@@ -979,6 +940,13 @@ const App: React.FC = () => {
   };
 
   const handleRestartDuel = () => {
+    // Keep names, but force both players to re-confirm
+    const resetPlayers: Player[] = players.map((p) => ({
+      ...p,
+      ready: false,
+    }));
+
+    setPlayers(resetPlayers);
     setRounds([]);
     setCurrentRoundNumber(1);
     setCurrentPatcherIndex(0);
@@ -993,14 +961,16 @@ const App: React.FC = () => {
     setEndgameBaseAttempts(0);
     setEndgameBonusAttempts(0);
     setPrevValidCodesCount(null);
-    setPhase("patcherSetup");
+    setPhase("enterNames");
 
-    // This flag tells *all* clients to clear their local-only UI fields too
     broadcastState({
-      phase: "patcherSetup",
+      players: resetPlayers,
+      phase: "enterNames",
       currentPatcherIndex: 0,
       currentRoundNumber: 1,
       rules: [],
+      patcherSecretCode: "",
+      patcherRuleText: "",
       rounds: [],
       playerScores: [0, 0],
       lastResult: null,
@@ -1012,20 +982,17 @@ const App: React.FC = () => {
       endgameBaseAttempts: 0,
       endgameBonusAttempts: 0,
       prevValidCodesCount: null,
-      resetLocalFields: true,
     });
   };
 
   const currentPatcherName = currentPatcher.name || "?";
   const currentBreakerName = players[1 - currentPatcherIndex].name || "?";
 
-  // Is this browser currently the patcher or breaker?
   const isPatcherHere =
     playerSeat !== null && playerSeat === currentPatcherIndex;
   const isBreakerHere =
     playerSeat !== null && playerSeat === currentBreakerIndex;
 
-  // --- name confirm handler for this browser's seat ---
   const handleConfirmName = () => {
     if (playerSeat === null) return;
     const index = playerSeat;
@@ -1059,7 +1026,6 @@ const App: React.FC = () => {
     });
   };
 
-  // ---------- SEAT SELECTION SCREEN ----------
   if (playerSeat === null) {
     return (
       <div
@@ -1163,7 +1129,6 @@ const App: React.FC = () => {
     );
   }
 
-  // From this point on, playerSeat is 0 or 1
   const thisPlayerIndex = playerSeat;
   const thisPlayer = players[thisPlayerIndex];
 
@@ -1219,7 +1184,6 @@ const App: React.FC = () => {
           Two players. One evolving rule system. Patcher vs Breaker in a duel.
         </p>
 
-        {/* === ENTER NAMES — EACH SEAT ENTERS ITS OWN NAME AND CONFIRMS === */}
         {phase === "enterNames" && (
           <div
             style={{
@@ -1297,7 +1261,6 @@ const App: React.FC = () => {
               {thisPlayer.ready ? "Name confirmed ✓" : "Confirm name"}
             </button>
 
-            {/* Show status of both players */}
             <div
               style={{
                 background: "#020617",
@@ -1347,10 +1310,8 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* === EVERYTHING AFTER NAMES === */}
         {phase !== "enterNames" && (
           <>
-            {/* STATUS + SCORE — SHOWN ON BOTH DEVICES */}
             <div
               style={{
                 marginBottom: 8,
@@ -1382,7 +1343,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* === PATCHER SETUP VIEW — CURRENT PATCHER'S MACHINE ONLY === */}
             {phase === "patcherSetup" && isPatcherHere && (
               <PatcherView
                 mode={"patcher"}
@@ -1425,7 +1385,6 @@ const App: React.FC = () => {
               />
             )}
 
-            {/* PATCHER'S MACHINE WHEN IT'S NOT PATCHER PHASE */}
             {phase !== "patcherSetup" && isPatcherHere && (
               <div
                 style={{
@@ -1444,7 +1403,6 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {/* NON-PATCHER MACHINE DURING PATCHER SETUP */}
             {phase === "patcherSetup" && !isPatcherHere && (
               <div
                 style={{
@@ -1463,10 +1421,9 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {/* === BREAKER TURN VIEW — CURRENT BREAKER'S MACHINE ONLY === */}
             {phase === "breakerTurn" && isBreakerHere && (
               <BreakerView
-                mode="phone" // stylistic choice; could add "desktop" mode later
+                mode="phone"
                 currentBreaker={currentBreaker}
                 breakerGuess={breakerGuess}
                 setBreakerGuess={setBreakerGuess}
@@ -1487,7 +1444,6 @@ const App: React.FC = () => {
               />
             )}
 
-            {/* NON-BREAKER MACHINE DURING BREAKER TURN */}
             {phase === "breakerTurn" && !isBreakerHere && (
               <div
                 style={{
@@ -1506,7 +1462,6 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {/* BREAKER'S MACHINE WHEN IT'S NOT BREAKER PHASE */}
             {phase !== "breakerTurn" && isBreakerHere && (
               <div
                 style={{
@@ -1525,7 +1480,6 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {/* === RESULT SCREENS — SHOWN ON BOTH DEVICES === */}
             {(phase === "validResult" ||
               phase === "exactResult" ||
               phase === "breakerWin" ||
@@ -1544,7 +1498,6 @@ const App: React.FC = () => {
               />
             )}
 
-            {/* === DUEL HISTORY — SHOWN ON BOTH DEVICES === */}
             {rounds.length > 0 && (
               <div
                 style={{
