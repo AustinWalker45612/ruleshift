@@ -129,6 +129,9 @@ const App: React.FC = () => {
     () => initialRoomFromUrl ?? ""
   );
 
+  // Feedback when copying the room link
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
   // Persistent clientId per device (localStorage)
   const [clientId] = useState<string>(() => {
     try {
@@ -316,6 +319,32 @@ const App: React.FC = () => {
     }
   };
 
+  // Copy room link to clipboard
+  const handleCopyRoomLink = async () => {
+    if (!roomId || typeof window === "undefined") return;
+    const url = `${window.location.origin}/room/${roomId}`;
+
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.clipboard &&
+        "writeText" in navigator.clipboard
+      ) {
+        await navigator.clipboard.writeText(url);
+        setCopyFeedback("Link copied!");
+      } else {
+        // Fallback: select-able URL in feedback
+        setCopyFeedback("Copy not supported here — use the address bar.");
+      }
+    } catch {
+      setCopyFeedback("Copy failed — use the address bar instead.");
+    }
+
+    setTimeout(() => {
+      setCopyFeedback(null);
+    }, 2000);
+  };
+
   // When we have a roomId, join it on the server and get a seat assigned
   useEffect(() => {
     if (!roomId) return;
@@ -326,7 +355,8 @@ const App: React.FC = () => {
 
     const handleJoined = (data: any) => {
       if (!data) return;
-      if (data.roomId !== roomId || data.clientId !== clientId) return;
+      if (data.roomId !== roomId || !data || data.clientId !== clientId)
+        return;
 
       console.log("🎯 Received room:joined", data);
       const seatIndex =
@@ -1203,6 +1233,26 @@ const App: React.FC = () => {
   const seat1Connected = !!seat1?.connected;
   const spectatorsCount = roomPresence?.spectatorsCount ?? 0;
 
+  // Lobby status message
+  let lobbyMessage = "";
+  if (phase === "enterNames") {
+    if (!seat0 && !seat1) {
+      lobbyMessage = "Waiting for both players to join this room.";
+    } else if (seat0 && !seat1) {
+      lobbyMessage = "Waiting for Player 2 to join this room.";
+    } else if (!seat0 && seat1) {
+      lobbyMessage = "Waiting for Player 1 to join this room.";
+    } else if (!players[0].ready || !players[1].ready) {
+      lobbyMessage =
+        "Both players are connected. Each player should enter and confirm their name.";
+    } else {
+      lobbyMessage =
+        "Both players are ready. Either player can start the duel.";
+    }
+  } else {
+    lobbyMessage = "Game in progress.";
+  }
+
   // --- name confirm handler for this browser's seat ---
   const handleConfirmName = () => {
     if (isSpectator || playerSeat === null) return;
@@ -1382,42 +1432,87 @@ const App: React.FC = () => {
           RuleShift
         </h1>
 
-        <p
+        {/* Room + role + copy link */}
+        <div
           style={{
-            textAlign: "center",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
             marginBottom: 4,
             fontSize: 12,
-            opacity: 0.75,
           }}
         >
-          Room: <strong>{roomId}</strong>{" "}
-          <span style={{ opacity: 0.7 }}>
-            •{" "}
-            {isSpectator
-              ? "You are watching as a spectator"
-              : `You are Player ${thisPlayerIndex + 1}`}
+          <span>
+            Room: <strong>{roomId}</strong>{" "}
+            <span style={{ opacity: 0.7 }}>
+              •{" "}
+              {isSpectator
+                ? "You are watching as a spectator"
+                : `You are Player ${thisPlayerIndex + 1}`}
+            </span>
           </span>
-        </p>
+          <button
+            onClick={handleCopyRoomLink}
+            style={{
+              padding: "4px 10px",
+              borderRadius: 999,
+              border: "1px solid #4b5563",
+              background: "#020617",
+              color: "#e5e7eb",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            Copy room link
+          </button>
+        </div>
 
-        {roomPresence && (
+        {copyFeedback && (
           <p
             style={{
               textAlign: "center",
-              marginBottom: 16,
+              marginBottom: 6,
               fontSize: 11,
-              opacity: 0.8,
+              opacity: 0.85,
             }}
           >
-            Connections — P1:{" "}
-            <span style={{ color: seat0Connected ? "#4ade80" : "#f97373" }}>
-              {seat0Connected ? "online" : "offline"}
-            </span>{" "}
-            · P2:{" "}
-            <span style={{ color: seat1Connected ? "#4ade80" : "#f97373" }}>
-              {seat1Connected ? "online" : "offline"}
-            </span>{" "}
-            · Spectators: {spectatorsCount}
+            {copyFeedback}
           </p>
+        )}
+
+        {roomPresence && (
+          <>
+            <p
+              style={{
+                textAlign: "center",
+                marginBottom: 4,
+                fontSize: 11,
+                opacity: 0.8,
+              }}
+            >
+              Connections — P1:{" "}
+              <span style={{ color: seat0Connected ? "#4ade80" : "#f97373" }}>
+                {seat0Connected ? "online" : "offline"}
+              </span>{" "}
+              · P2:{" "}
+              <span style={{ color: seat1Connected ? "#4ade80" : "#f97373" }}>
+                {seat1Connected ? "online" : "offline"}
+              </span>{" "}
+              · Spectators: {spectatorsCount}
+            </p>
+            <p
+              style={{
+                textAlign: "center",
+                marginBottom: 16,
+                fontSize: 11,
+                opacity: 0.75,
+              }}
+            >
+              {lobbyMessage}
+            </p>
+          </>
         )}
 
         {!roomPresence && (
