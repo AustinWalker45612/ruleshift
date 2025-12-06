@@ -175,6 +175,25 @@ const App: React.FC = () => {
   // Room presence (connections, spectators)
   const [roomPresence, setRoomPresence] = useState<RoomPresence | null>(null);
 
+  // Copy room link UI state
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">(
+    "idle"
+  );
+
+  const handleCopyRoomLink = async () => {
+    if (typeof window === "undefined" || !roomId) return;
+    const url = `${window.location.origin}/room/${roomId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyStatus("copied");
+      setTimeout(() => setCopyStatus("idle"), 2000);
+    } catch (err) {
+      console.error("Failed to copy room link", err);
+      setCopyStatus("error");
+      setTimeout(() => setCopyStatus("idle"), 2000);
+    }
+  };
+
   const [players, setPlayers] = useState<Player[]>([
     { name: "", ready: false },
     { name: "", ready: false },
@@ -1280,7 +1299,37 @@ const App: React.FC = () => {
           </span>
         </p>
 
-        {/* You can plug your "Copy room link" button here if you haven't already */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginBottom: 12,
+          }}
+        >
+          <button
+            onClick={handleCopyRoomLink}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 999,
+              border: "1px solid #4b5563",
+              background: "#020617",
+              color: "#e5e7eb",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            <span>Copy room link</span>
+            {copyStatus === "copied" && (
+              <span style={{ fontSize: 11, color: "#4ade80" }}>✓ Copied</span>
+            )}
+            {copyStatus === "error" && (
+              <span style={{ fontSize: 11, color: "#f97373" }}>Error</span>
+            )}
+          </button>
+        </div>
 
         {roomPresence && (
           <p
@@ -1674,7 +1723,7 @@ const App: React.FC = () => {
                 </h3>
                 <p style={{ fontSize: 14 }}>
                   Waiting for{" "}
-                    <strong>{currentPatcherName || "your opponent"}</strong> to
+                  <strong>{currentPatcherName || "your opponent"}</strong> to
                   set the secret code and add a new rule.
                 </p>
               </div>
