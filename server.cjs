@@ -156,23 +156,28 @@ setInterval(cleanupExpiredRooms, ROOM_SWEEP_INTERVAL_MS);
 
 // Small helper so we don’t duplicate logic
 async function upsertPlayer({ clientId, name }) {
-  if (!clientId || !name) return null;
+  if (!clientId || !name) {
+    console.warn("upsertPlayer missing data", { clientId, name });
+    return null;
+  }
 
-  // In your schema, `id` is the TEXT primary key.
-  // We treat it as the stable per-device clientId.
-  return prisma.player.upsert({
+  // `id` is the primary key; we use clientId as that stable id
+  const player = await prisma.player.upsert({
     where: { id: clientId },
     update: {
       name,
-      updatedAt: new Date(),
+      // updatedAt is handled automatically by @updatedAt in the schema
     },
     create: {
       id: clientId,
       name,
-      // totalXp, duelsPlayed, duelsWon all use defaults from schema
+      // totalXp, duelsPlayed, duelsWon all use defaults in schema
     },
   });
+
+  return player;
 }
+
 
 io.on("connection", (socket) => {
   console.log("✅ Client connected:", socket.id);
@@ -261,15 +266,23 @@ io.on("connection", (socket) => {
    */
   socket.on("player:upsert", async (payload) => {
     try {
+      console.log("➡️ player:upsert received:", payload);
+
       const { clientId, name } = payload || {};
-      if (!clientId || !name) return;
+      if (!clientId || !name) {
+        console.warn("player:upsert missing clientId or name", payload);
+        return;
+      }
 
       const player = await upsertPlayer({ clientId, name });
+
       if (player) {
         console.log("💾 Saved player:", player.id, player.name);
+      } else {
+        console.warn("⚠️ upsertPlayer returned null for", { clientId, name });
       }
     } catch (err) {
-      console.error("Error in player:upsert", err);
+      console.error("❌ Error in player:upsert", err);
     }
   });
 

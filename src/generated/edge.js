@@ -96,7 +96,6 @@ exports.Prisma.PlayerScalarFieldEnum = {
   id: 'id',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  clientId: 'clientId',
   name: 'name',
   totalXp: 'totalXp',
   duelsPlayed: 'duelsPlayed',
@@ -125,10 +124,10 @@ const config = {
   "clientVersion": "7.1.0",
   "engineVersion": "ab635e6b9d606fa5c8fb8b1a7f909c3c3c1c98ba",
   "activeProvider": "postgresql",
-  "inlineSchema": "generator client {\n  provider     = \"prisma-client-js\"\n  output       = \"../src/generated\"\n  moduleFormat = \"cjs\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nmodel Player {\n  id          String   @id @default(cuid())\n  createdAt   DateTime @default(now())\n  updatedAt   DateTime @updatedAt\n  clientId    String   @unique\n  name        String\n  totalXp     Int      @default(0)\n  duelsPlayed Int      @default(0)\n  duelsWon    Int      @default(0)\n}\n"
+  "inlineSchema": "generator client {\n  provider     = \"prisma-client-js\"\n  output       = \"../src/generated\"\n  moduleFormat = \"cjs\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nmodel Player {\n  id          String   @id\n  createdAt   DateTime @default(now())\n  updatedAt   DateTime @updatedAt\n  name        String\n  totalXp     Int      @default(0)\n  duelsPlayed Int      @default(0)\n  duelsWon    Int      @default(0)\n}\n"
 }
 
-config.runtimeDataModel = JSON.parse("{\"models\":{\"Player\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"clientId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"totalXp\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"duelsPlayed\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"duelsWon\",\"kind\":\"scalar\",\"type\":\"Int\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
+config.runtimeDataModel = JSON.parse("{\"models\":{\"Player\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"totalXp\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"duelsPlayed\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"duelsWon\",\"kind\":\"scalar\",\"type\":\"Int\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
 defineDmmfProperty(exports.Prisma, config.runtimeDataModel)
 config.compilerWasm = {
   getRuntime: async () => require('./query_compiler_bg.js'),

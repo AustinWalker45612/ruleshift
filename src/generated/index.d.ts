@@ -890,7 +890,6 @@ export namespace Prisma {
     id: string | null
     createdAt: Date | null
     updatedAt: Date | null
-    clientId: string | null
     name: string | null
     totalXp: number | null
     duelsPlayed: number | null
@@ -901,7 +900,6 @@ export namespace Prisma {
     id: string | null
     createdAt: Date | null
     updatedAt: Date | null
-    clientId: string | null
     name: string | null
     totalXp: number | null
     duelsPlayed: number | null
@@ -912,7 +910,6 @@ export namespace Prisma {
     id: number
     createdAt: number
     updatedAt: number
-    clientId: number
     name: number
     totalXp: number
     duelsPlayed: number
@@ -937,7 +934,6 @@ export namespace Prisma {
     id?: true
     createdAt?: true
     updatedAt?: true
-    clientId?: true
     name?: true
     totalXp?: true
     duelsPlayed?: true
@@ -948,7 +944,6 @@ export namespace Prisma {
     id?: true
     createdAt?: true
     updatedAt?: true
-    clientId?: true
     name?: true
     totalXp?: true
     duelsPlayed?: true
@@ -959,7 +954,6 @@ export namespace Prisma {
     id?: true
     createdAt?: true
     updatedAt?: true
-    clientId?: true
     name?: true
     totalXp?: true
     duelsPlayed?: true
@@ -1057,7 +1051,6 @@ export namespace Prisma {
     id: string
     createdAt: Date
     updatedAt: Date
-    clientId: string
     name: string
     totalXp: number
     duelsPlayed: number
@@ -1087,7 +1080,6 @@ export namespace Prisma {
     id?: boolean
     createdAt?: boolean
     updatedAt?: boolean
-    clientId?: boolean
     name?: boolean
     totalXp?: boolean
     duelsPlayed?: boolean
@@ -1098,7 +1090,6 @@ export namespace Prisma {
     id?: boolean
     createdAt?: boolean
     updatedAt?: boolean
-    clientId?: boolean
     name?: boolean
     totalXp?: boolean
     duelsPlayed?: boolean
@@ -1109,7 +1100,6 @@ export namespace Prisma {
     id?: boolean
     createdAt?: boolean
     updatedAt?: boolean
-    clientId?: boolean
     name?: boolean
     totalXp?: boolean
     duelsPlayed?: boolean
@@ -1120,14 +1110,13 @@ export namespace Prisma {
     id?: boolean
     createdAt?: boolean
     updatedAt?: boolean
-    clientId?: boolean
     name?: boolean
     totalXp?: boolean
     duelsPlayed?: boolean
     duelsWon?: boolean
   }
 
-  export type PlayerOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdAt" | "updatedAt" | "clientId" | "name" | "totalXp" | "duelsPlayed" | "duelsWon", ExtArgs["result"]["player"]>
+  export type PlayerOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdAt" | "updatedAt" | "name" | "totalXp" | "duelsPlayed" | "duelsWon", ExtArgs["result"]["player"]>
 
   export type $PlayerPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Player"
@@ -1136,7 +1125,6 @@ export namespace Prisma {
       id: string
       createdAt: Date
       updatedAt: Date
-      clientId: string
       name: string
       totalXp: number
       duelsPlayed: number
@@ -1567,7 +1555,6 @@ export namespace Prisma {
     readonly id: FieldRef<"Player", 'String'>
     readonly createdAt: FieldRef<"Player", 'DateTime'>
     readonly updatedAt: FieldRef<"Player", 'DateTime'>
-    readonly clientId: FieldRef<"Player", 'String'>
     readonly name: FieldRef<"Player", 'String'>
     readonly totalXp: FieldRef<"Player", 'Int'>
     readonly duelsPlayed: FieldRef<"Player", 'Int'>
@@ -1956,7 +1943,6 @@ export namespace Prisma {
     id: 'id',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
-    clientId: 'clientId',
     name: 'name',
     totalXp: 'totalXp',
     duelsPlayed: 'duelsPlayed',
@@ -2053,7 +2039,6 @@ export namespace Prisma {
     id?: StringFilter<"Player"> | string
     createdAt?: DateTimeFilter<"Player"> | Date | string
     updatedAt?: DateTimeFilter<"Player"> | Date | string
-    clientId?: StringFilter<"Player"> | string
     name?: StringFilter<"Player"> | string
     totalXp?: IntFilter<"Player"> | number
     duelsPlayed?: IntFilter<"Player"> | number
@@ -2064,7 +2049,6 @@ export namespace Prisma {
     id?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-    clientId?: SortOrder
     name?: SortOrder
     totalXp?: SortOrder
     duelsPlayed?: SortOrder
@@ -2073,7 +2057,6 @@ export namespace Prisma {
 
   export type PlayerWhereUniqueInput = Prisma.AtLeast<{
     id?: string
-    clientId?: string
     AND?: PlayerWhereInput | PlayerWhereInput[]
     OR?: PlayerWhereInput[]
     NOT?: PlayerWhereInput | PlayerWhereInput[]
@@ -2083,13 +2066,12 @@ export namespace Prisma {
     totalXp?: IntFilter<"Player"> | number
     duelsPlayed?: IntFilter<"Player"> | number
     duelsWon?: IntFilter<"Player"> | number
-  }, "id" | "clientId">
+  }, "id">
 
   export type PlayerOrderByWithAggregationInput = {
     id?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-    clientId?: SortOrder
     name?: SortOrder
     totalXp?: SortOrder
     duelsPlayed?: SortOrder
@@ -2108,7 +2090,6 @@ export namespace Prisma {
     id?: StringWithAggregatesFilter<"Player"> | string
     createdAt?: DateTimeWithAggregatesFilter<"Player"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Player"> | Date | string
-    clientId?: StringWithAggregatesFilter<"Player"> | string
     name?: StringWithAggregatesFilter<"Player"> | string
     totalXp?: IntWithAggregatesFilter<"Player"> | number
     duelsPlayed?: IntWithAggregatesFilter<"Player"> | number
@@ -2116,10 +2097,9 @@ export namespace Prisma {
   }
 
   export type PlayerCreateInput = {
-    id?: string
+    id: string
     createdAt?: Date | string
     updatedAt?: Date | string
-    clientId: string
     name: string
     totalXp?: number
     duelsPlayed?: number
@@ -2127,10 +2107,9 @@ export namespace Prisma {
   }
 
   export type PlayerUncheckedCreateInput = {
-    id?: string
+    id: string
     createdAt?: Date | string
     updatedAt?: Date | string
-    clientId: string
     name: string
     totalXp?: number
     duelsPlayed?: number
@@ -2141,7 +2120,6 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    clientId?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     totalXp?: IntFieldUpdateOperationsInput | number
     duelsPlayed?: IntFieldUpdateOperationsInput | number
@@ -2152,7 +2130,6 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    clientId?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     totalXp?: IntFieldUpdateOperationsInput | number
     duelsPlayed?: IntFieldUpdateOperationsInput | number
@@ -2160,10 +2137,9 @@ export namespace Prisma {
   }
 
   export type PlayerCreateManyInput = {
-    id?: string
+    id: string
     createdAt?: Date | string
     updatedAt?: Date | string
-    clientId: string
     name: string
     totalXp?: number
     duelsPlayed?: number
@@ -2174,7 +2150,6 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    clientId?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     totalXp?: IntFieldUpdateOperationsInput | number
     duelsPlayed?: IntFieldUpdateOperationsInput | number
@@ -2185,7 +2160,6 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    clientId?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     totalXp?: IntFieldUpdateOperationsInput | number
     duelsPlayed?: IntFieldUpdateOperationsInput | number
@@ -2233,7 +2207,6 @@ export namespace Prisma {
     id?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-    clientId?: SortOrder
     name?: SortOrder
     totalXp?: SortOrder
     duelsPlayed?: SortOrder
@@ -2250,7 +2223,6 @@ export namespace Prisma {
     id?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-    clientId?: SortOrder
     name?: SortOrder
     totalXp?: SortOrder
     duelsPlayed?: SortOrder
@@ -2261,7 +2233,6 @@ export namespace Prisma {
     id?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-    clientId?: SortOrder
     name?: SortOrder
     totalXp?: SortOrder
     duelsPlayed?: SortOrder

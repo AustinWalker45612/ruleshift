@@ -1242,6 +1242,7 @@ const App: React.FC = () => {
     });
 
     // Also persist this player to the backend DB
+    console.log("🔔 Emitting player:upsert", { clientId, rawName });
     socket.emit("player:upsert", {
       clientId,
       name: rawName,

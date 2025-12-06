@@ -9,10 +9,9 @@ datasource db {
 }
 
 model Player {
-  id          String   @id @default(cuid())
+  id          String   @id
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  clientId    String   @unique
   name        String
   totalXp     Int      @default(0)
   duelsPlayed Int      @default(0)

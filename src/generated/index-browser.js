@@ -124,7 +124,6 @@ exports.Prisma.PlayerScalarFieldEnum = {
   id: 'id',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  clientId: 'clientId',
   name: 'name',
   totalXp: 'totalXp',
   duelsPlayed: 'duelsPlayed',
