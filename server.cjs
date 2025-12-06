@@ -4,9 +4,18 @@ const { Server } = require("socket.io");
 
 // ---- Prisma setup (Prisma 7 + Postgres adapter) ----
 require("dotenv").config();
-const { PrismaClient } = require("@prisma/client");
+
+// ✅ use the generated Prisma client instead of @prisma/client
+const { PrismaClient } = require("./src/generated/client.js");
+
 const { Pool } = require("pg");
 const { PrismaPg } = require("@prisma/adapter-pg");
+
+if (!process.env.DATABASE_URL) {
+  console.warn(
+    "⚠️ DATABASE_URL is not set. Prisma will fail to connect to the database."
+  );
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -145,6 +154,26 @@ function cleanupExpiredRooms() {
 
 setInterval(cleanupExpiredRooms, ROOM_SWEEP_INTERVAL_MS);
 
+// Small helper so we don’t duplicate logic
+async function upsertPlayer({ clientId, name }) {
+  if (!clientId || !name) return null;
+
+  // In your schema, `id` is the TEXT primary key.
+  // We treat it as the stable per-device clientId.
+  return prisma.player.upsert({
+    where: { id: clientId },
+    update: {
+      name,
+      updatedAt: new Date(),
+    },
+    create: {
+      id: clientId,
+      name,
+      // totalXp, duelsPlayed, duelsWon all use defaults from schema
+    },
+  });
+}
+
 io.on("connection", (socket) => {
   console.log("✅ Client connected:", socket.id);
 
@@ -235,30 +264,10 @@ io.on("connection", (socket) => {
       const { clientId, name } = payload || {};
       if (!clientId || !name) return;
 
-      // We don't assume `name` is unique; we find by name if it exists.
-      const existing = await prisma.player.findFirst({
-        where: { name },
-      });
-
-      let player;
-      if (existing) {
-        player = await prisma.player.update({
-          where: { id: existing.id },
-          data: {
-            name,
-            // updatedAt is handled by @updatedAt in the schema if you have it
-          },
-        });
-      } else {
-        player = await prisma.player.create({
-          data: {
-            name,
-            // you can later add clientId or stats fields here
-          },
-        });
+      const player = await upsertPlayer({ clientId, name });
+      if (player) {
+        console.log("💾 Saved player:", player.id, player.name);
       }
-
-      console.log("💾 Saved player:", player.id, player.name);
     } catch (err) {
       console.error("Error in player:upsert", err);
     }
