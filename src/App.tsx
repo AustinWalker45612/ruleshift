@@ -54,6 +54,7 @@ type TemplateOptionSummary = {
 };
 
 // Which seat this browser is playing as (or none yet)
+// 0 → Player 1, 1 → Player 2, null → spectator / not assigned
 type PlayerSeat = 0 | 1 | null;
 
 /**
@@ -61,7 +62,6 @@ type PlayerSeat = 0 | 1 | null;
  * (Per-device-only things like playerSeat, breakerError, etc. stay local.)
  */
 type SyncedState = {
-  // Room identifier (Step 1+2+3)
   roomId?: string;
 
   players: Player[];
@@ -98,7 +98,31 @@ const App: React.FC = () => {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [roomInput, setRoomInput] = useState<string>("");
 
-  // Which seat this browser is controlling: Player 1 (0) or Player 2 (1)
+  // Step 4: persistent clientId per device (localStorage)
+  const [clientId] = useState<string>(() => {
+    try {
+      const key = "ruleshiftClientId";
+      const existing =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem(key)
+          : null;
+      if (existing) return existing;
+
+      const newId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(key, newId);
+      }
+      return newId;
+    } catch {
+      // Fallback if localStorage not available
+      return Math.random().toString(36).slice(2);
+    }
+  });
+
+  // Which seat this browser is controlling: Player 1 (0) or Player 2 (1), or spectator (null)
   const [playerSeat, setPlayerSeat] = useState<PlayerSeat>(null);
 
   const [players, setPlayers] = useState<Player[]>([
@@ -242,16 +266,39 @@ const App: React.FC = () => {
     };
   }, [isEndgameWindow, prevValidCodesCount, currentValidCount]);
 
-  // ---------- ROOM JOIN HANDLER (Step 3) ----------
+  // ---------- ROOM JOIN HANDLER (Step 3 + 4) ----------
   const handleJoinRoom = () => {
     const trimmed = roomInput.trim();
     if (!trimmed) return;
 
-    // You can normalize room codes here if you like:
-    // e.g., uppercase to make them easier to share.
     const normalized = trimmed.toUpperCase();
     setRoomId(normalized);
   };
+
+  // When we have a roomId, join it on the server and get a seat assigned
+  useEffect(() => {
+    if (!roomId) return;
+
+    const payload = { roomId, clientId };
+    console.log("🧩 Joining room with payload:", payload);
+    socket.emit("room:join", payload);
+
+    const handleJoined = (data: any) => {
+      if (!data) return;
+      if (data.roomId !== roomId || data.clientId !== clientId) return;
+
+      console.log("🎯 Received room:joined", data);
+      const seatIndex =
+        data.seatIndex === 0 || data.seatIndex === 1 ? data.seatIndex : null;
+      setPlayerSeat(seatIndex);
+    };
+
+    socket.on("room:joined", handleJoined);
+
+    return () => {
+      socket.off("room:joined", handleJoined);
+    };
+  }, [roomId, clientId]);
 
   // ---------- SOCKET BROADCAST HELPER ----------
   const broadcastState = (overrides: Partial<SyncedState> = {}) => {
@@ -294,7 +341,7 @@ const App: React.FC = () => {
       // Ignore our own echo
       if (remote.sender && remote.sender === socket.id) return;
 
-      // Optionally ignore states for other rooms, if server ever cross-sends
+      // If we have a roomId, ignore states for other rooms
       if (roomId && remote.roomId && remote.roomId !== roomId) {
         return;
       }
@@ -1083,15 +1130,19 @@ const App: React.FC = () => {
   const currentPatcherName = currentPatcher.name || "?";
   const currentBreakerName = players[1 - currentPatcherIndex].name || "?";
 
+  const isSpectator = playerSeat === null;
+  const thisPlayerIndex = playerSeat ?? 0;
+  const thisPlayer = players[thisPlayerIndex];
+
   // Is this browser currently the patcher or breaker?
   const isPatcherHere =
-    playerSeat !== null && playerSeat === currentPatcherIndex;
+    !isSpectator && playerSeat === currentPatcherIndex;
   const isBreakerHere =
-    playerSeat !== null && playerSeat === currentBreakerIndex;
+    !isSpectator && playerSeat === currentBreakerIndex;
 
   // --- name confirm handler for this browser's seat ---
   const handleConfirmName = () => {
-    if (playerSeat === null) return;
+    if (isSpectator || playerSeat === null) return;
     const index = playerSeat;
     const rawName = players[index].name.trim();
     if (!rawName) return;
@@ -1114,7 +1165,7 @@ const App: React.FC = () => {
   };
 
   const handleNameChange = (value: string) => {
-    if (playerSeat === null) return;
+    if (isSpectator || playerSeat === null) return;
     const index = playerSeat;
     setPlayers((prev) => {
       const updated: Player[] = [{ ...prev[0] }, { ...prev[1] }];
@@ -1123,7 +1174,7 @@ const App: React.FC = () => {
     });
   };
 
-  // ---------- ROOM JOIN SCREEN (before seat selection) ----------
+  // ---------- ROOM JOIN SCREEN (before any game UI) ----------
   if (!roomId) {
     return (
       <div
@@ -1237,124 +1288,7 @@ const App: React.FC = () => {
     );
   }
 
-  // ---------- SEAT SELECTION SCREEN ----------
-  if (playerSeat === null) {
-    return (
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          overflowY: "auto",
-          padding: "16px clamp(8px, 4vw, 32px)",
-          boxSizing: "border-box",
-          fontFamily:
-            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-          background: "#0f172a",
-          color: "#e5e7eb",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 560,
-            width: "100%",
-            background: "#020617",
-            padding: 28,
-            borderRadius: 18,
-            boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
-          }}
-        >
-          <h1
-            style={{
-              textAlign: "center",
-              marginBottom: 6,
-              fontSize: "clamp(28px, 4vw, 40px)",
-            }}
-          >
-            RuleShift
-          </h1>
-          <p
-            style={{
-              textAlign: "center",
-              fontSize: 12,
-              opacity: 0.72,
-              marginBottom: 4,
-            }}
-          >
-            Room: <strong>{roomId}</strong>
-          </p>
-          <p
-            style={{
-              textAlign: "center",
-              fontSize: "clamp(13px, 1.4vw, 15px)",
-              opacity: 0.8,
-              marginBottom: 24,
-            }}
-          >
-            On this device, which player are you?
-          </p>
-
-          <button
-            onClick={() => setPlayerSeat(0)}
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              padding: "10px 16px",
-              borderRadius: 999,
-              border: "1px solid #4b5563",
-              background: "#111827",
-              color: "#e5e7eb",
-              cursor: "pointer",
-              marginBottom: 12,
-              fontWeight: 600,
-              fontSize: 14,
-            }}
-          >
-            I am Player 1
-            {players[0].name ? ` (${players[0].name})` : ""}
-          </button>
-
-          <button
-            onClick={() => setPlayerSeat(1)}
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              padding: "10px 16px",
-              borderRadius: 999,
-              border: "1px solid #4b5563",
-              background: "#111827",
-              color: "#e5e7eb",
-              cursor: "pointer",
-              fontWeight: 600,
-              fontSize: 14,
-            }}
-          >
-            I am Player 2
-            {players[1].name ? ` (${players[1].name})` : ""}
-          </button>
-
-          <p
-            style={{
-              fontSize: 12,
-              opacity: 0.7,
-              marginTop: 16,
-              textAlign: "center",
-            }}
-          >
-            Have Player 1 and Player 2 each open this page on their own device,
-            join the same room, then pick their seat.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // From this point on, playerSeat is 0 or 1
-  const thisPlayerIndex = playerSeat;
-  const thisPlayer = players[thisPlayerIndex];
-
+  // From here, we have a roomId. Seat is assigned by the server
   return (
     <div
       style={{
@@ -1393,7 +1327,13 @@ const App: React.FC = () => {
             opacity: 0.75,
           }}
         >
-          Room: <strong>{roomId}</strong>
+          Room: <strong>{roomId}</strong>{" "}
+          <span style={{ opacity: 0.7 }}>
+            •{" "}
+            {isSpectator
+              ? "You are watching as a spectator"
+              : `You are Player ${thisPlayerIndex + 1}`}
+          </span>
         </p>
 
         <p
@@ -1406,138 +1346,216 @@ const App: React.FC = () => {
           Two players. One evolving rule system. Patcher vs Breaker in a duel.
         </p>
 
-        {/* === ENTER NAMES — EACH SEAT ENTERS ITS OWN NAME AND CONFIRMS === */}
+        {/* === ENTER NAMES === */}
         {phase === "enterNames" && (
-          <div
-            style={{
-              background: "#111827",
-              padding: 20,
-              borderRadius: 14,
-              boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
-              maxWidth: 560,
-              margin: "0 auto",
-            }}
-          >
-            <h2 style={{ marginBottom: 8, fontSize: "clamp(18px,2.3vw,22px)" }}>
-              {thisPlayerIndex === 0
-                ? "Player 1, enter your name"
-                : "Player 2, enter your name"}
-            </h2>
-            <p
-              style={{
-                marginBottom: 12,
-                fontSize: 12,
-                opacity: 0.7,
-              }}
-            >
-              This screen is for{" "}
-              <strong>
-                Player {thisPlayerIndex + 1}
-                {thisPlayer.name ? ` (${thisPlayer.name})` : ""}
-              </strong>
-              . Each player only sets and confirms their own name.
-            </p>
-
-            <label style={{ display: "block", marginBottom: 12 }}>
-              Your name:
-              <input
+          <>
+            {!isSpectator ? (
+              // Player devices: enter own name
+              <div
                 style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  marginTop: 4,
-                  padding: 10,
-                  borderRadius: 8,
-                  border: "1px solid #374151",
-                  background: "#020617",
-                  color: "#e5e7eb",
-                  fontSize: 14,
+                  background: "#111827",
+                  padding: 20,
+                  borderRadius: 14,
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
+                  maxWidth: 560,
+                  margin: "0 auto",
                 }}
-                value={thisPlayer.name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleConfirmName();
-                  }
+              >
+                <h2
+                  style={{
+                    marginBottom: 8,
+                    fontSize: "clamp(18px,2.3vw,22px)",
+                  }}
+                >
+                  {thisPlayerIndex === 0
+                    ? "Player 1, enter your name"
+                    : "Player 2, enter your name"}
+                </h2>
+                <p
+                  style={{
+                    marginBottom: 12,
+                    fontSize: 12,
+                    opacity: 0.7,
+                  }}
+                >
+                  This screen is for{" "}
+                  <strong>
+                    Player {thisPlayerIndex + 1}
+                    {thisPlayer.name ? ` (${thisPlayer.name})` : ""}
+                  </strong>
+                  . Each player only sets and confirms their own name.
+                </p>
+
+                <label style={{ display: "block", marginBottom: 12 }}>
+                  Your name:
+                  <input
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      marginTop: 4,
+                      padding: 10,
+                      borderRadius: 8,
+                      border: "1px solid #374151",
+                      background: "#020617",
+                      color: "#e5e7eb",
+                      fontSize: 14,
+                    }}
+                    value={thisPlayer.name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleConfirmName();
+                      }
+                    }}
+                    placeholder="Type your name"
+                  />
+                </label>
+
+                <button
+                  onClick={handleConfirmName}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "10px 16px",
+                    borderRadius: 999,
+                    border: "1px solid #4b5563",
+                    fontWeight: 500,
+                    cursor: thisPlayer.name.trim() ? "pointer" : "not-allowed",
+                    background: thisPlayer.ready ? "#16a34a" : "#111827",
+                    color: thisPlayer.ready ? "#ecfdf5" : "#e5e7eb",
+                    marginBottom: 12,
+                    fontSize: 14,
+                  }}
+                  disabled={!thisPlayer.name.trim()}
+                >
+                  {thisPlayer.ready ? "Name confirmed ✓" : "Confirm name"}
+                </button>
+
+                {/* Show status of both players */}
+                <div
+                  style={{
+                    background: "#020617",
+                    borderRadius: 8,
+                    padding: 8,
+                    border: "1px solid #1f2937",
+                    fontSize: 12,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div>
+                    Player 1:{" "}
+                    <strong>
+                      {players[0].name || "(not set yet)"}{" "}
+                      {players[0].ready ? "✓" : ""}
+                    </strong>
+                  </div>
+                  <div>
+                    Player 2:{" "}
+                    <strong>
+                      {players[1].name || "(not set yet)"}{" "}
+                      {players[1].ready ? "✓" : ""}
+                    </strong>
+                  </div>
+                </div>
+
+                <button
+                  onClick={startGame}
+                  disabled={!bothPlayersReady}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "11px 16px",
+                    borderRadius: 999,
+                    border: "none",
+                    fontWeight: 600,
+                    cursor: bothPlayersReady ? "pointer" : "not-allowed",
+                    background: bothPlayersReady ? "#2563eb" : "#1f2937",
+                    color: "#e5e7eb",
+                    fontSize: 15,
+                  }}
+                >
+                  {bothPlayersReady
+                    ? "Start Duel"
+                    : "Waiting for both players to confirm names"}
+                </button>
+              </div>
+            ) : (
+              // Spectator: read-only view of name status
+              <div
+                style={{
+                  background: "#111827",
+                  padding: 20,
+                  borderRadius: 14,
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
+                  maxWidth: 560,
+                  margin: "0 auto",
                 }}
-                placeholder="Type your name"
-              />
-            </label>
+              >
+                <h2
+                  style={{
+                    marginBottom: 8,
+                    fontSize: "clamp(18px,2.3vw,22px)",
+                  }}
+                >
+                  Spectator Lobby
+                </h2>
+                <p
+                  style={{
+                    marginBottom: 12,
+                    fontSize: 12,
+                    opacity: 0.7,
+                  }}
+                >
+                  You&apos;re watching this duel as a spectator. Names are set
+                  from the player devices.
+                </p>
 
-            <button
-              onClick={handleConfirmName}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "10px 16px",
-                borderRadius: 999,
-                border: "1px solid #4b5563",
-                fontWeight: 500,
-                cursor: thisPlayer.name.trim() ? "pointer" : "not-allowed",
-                background: thisPlayer.ready ? "#16a34a" : "#111827",
-                color: thisPlayer.ready ? "#ecfdf5" : "#e5e7eb",
-                marginBottom: 12,
-                fontSize: 14,
-              }}
-              disabled={!thisPlayer.name.trim()}
-            >
-              {thisPlayer.ready ? "Name confirmed ✓" : "Confirm name"}
-            </button>
+                <div
+                  style={{
+                    background: "#020617",
+                    borderRadius: 8,
+                    padding: 8,
+                    border: "1px solid #1f2937",
+                    fontSize: 12,
+                    marginBottom: 8,
+                  }}
+                >
+                  <div>
+                    Player 1:{" "}
+                    <strong>
+                      {players[0].name || "(not set yet)"}{" "}
+                      {players[0].ready ? "✓" : ""}
+                    </strong>
+                  </div>
+                  <div>
+                    Player 2:{" "}
+                    <strong>
+                      {players[1].name || "(not set yet)"}{" "}
+                      {players[1].ready ? "✓" : ""}
+                    </strong>
+                  </div>
+                </div>
 
-            {/* Show status of both players */}
-            <div
-              style={{
-                background: "#020617",
-                borderRadius: 8,
-                padding: 8,
-                border: "1px solid #1f2937",
-                fontSize: 12,
-                marginBottom: 12,
-              }}
-            >
-              <div>
-                Player 1:{" "}
-                <strong>
-                  {players[0].name || "(not set yet)"}{" "}
-                  {players[0].ready ? "✓" : ""}
-                </strong>
+                <p
+                  style={{
+                    fontSize: 12,
+                    opacity: 0.7,
+                    marginTop: 8,
+                  }}
+                >
+                  Once both players are ready and start the duel, you&apos;ll
+                  see the full game board.
+                </p>
               </div>
-              <div>
-                Player 2:{" "}
-                <strong>
-                  {players[1].name || "(not set yet)"}{" "}
-                  {players[1].ready ? "✓" : ""}
-                </strong>
-              </div>
-            </div>
-
-            <button
-              onClick={startGame}
-              disabled={!bothPlayersReady}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "11px 16px",
-                borderRadius: 999,
-                border: "none",
-                fontWeight: 600,
-                cursor: bothPlayersReady ? "pointer" : "not-allowed",
-                background: bothPlayersReady ? "#2563eb" : "#1f2937",
-                color: "#e5e7eb",
-                fontSize: 15,
-              }}
-            >
-              {bothPlayersReady
-                ? "Start Duel"
-                : "Waiting for both players to confirm names"}
-            </button>
-          </div>
+            )}
+          </>
         )}
 
         {/* === EVERYTHING AFTER NAMES === */}
         {phase !== "enterNames" && (
           <>
-            {/* STATUS + SCORE — SHOWN ON BOTH DEVICES */}
+            {/* STATUS + SCORE — SHOWN ON ALL DEVICES */}
             <div
               style={{
                 marginBottom: 8,
@@ -1728,7 +1746,7 @@ const App: React.FC = () => {
               </>
             )}
 
-            {/* === RESULT SCREENS — SHOWN ON BOTH DEVICES === */}
+            {/* === RESULT SCREENS — SHOWN ON ALL DEVICES === */}
             {(phase === "validResult" ||
               phase === "exactResult" ||
               phase === "breakerWin" ||
@@ -1747,7 +1765,7 @@ const App: React.FC = () => {
               />
             )}
 
-            {/* === DUEL HISTORY — SHOWN ON BOTH DEVICES === */}
+            {/* === DUEL HISTORY — SHOWN ON ALL DEVICES === */}
             <div
               style={{
                 background: "#020617",
@@ -1760,7 +1778,7 @@ const App: React.FC = () => {
             >
               <h3 style={{ marginBottom: 8, fontSize: 13 }}>Duel History</h3>
 
-              {rounds.length === 0 || rounds.length == 1 ? (
+              {rounds.length === 0 || rounds.length === 1 ? (
                 <p style={{ opacity: 0.6, fontSize: 12 }}>
                   Once you get further into the duel, completed rounds will
                   appear here.
