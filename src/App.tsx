@@ -1455,34 +1455,6 @@ const App: React.FC = () => {
               />
             )}
 
-            {/* PATCHER'S MACHINE WHEN IT'S NOT PATCHER PHASE */}
-            {phase !== "patcherSetup" && isPatcherHere && (
-              <div
-                style={{
-                  background: "#111827",
-                  padding: 20,
-                  borderRadius: 12,
-                  textAlign: "center",
-                  maxWidth: 520,
-                  margin: "0 auto",
-                  border: "1px solid #4b5563",
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: 15,
-                    marginBottom: 4,
-                    fontWeight: 600,
-                  }}
-                >
-                  Waiting for Breaker
-                </h3>
-                <p style={{ fontSize: 14, opacity: 0.9 }}>
-                  You’ll patch again when it’s your turn.
-                </p>
-              </div>
-            )}
-
             {/* NON-PATCHER MACHINE DURING PATCHER SETUP */}
             {phase === "patcherSetup" && !isPatcherHere && (
               <div
@@ -1597,36 +1569,6 @@ const App: React.FC = () => {
                   </div>
                 )}
               </>
-            )}
-
-            {/* BREAKER'S MACHINE WHEN IT'S NOT BREAKER PHASE */}
-            {phase !== "breakerTurn" && isBreakerHere && (
-              <div
-                style={{
-                  background: "#111827",
-                  padding: 20,
-                  borderRadius: 12,
-                  textAlign: "center",
-                  maxWidth: 520,
-                  margin: "0 auto",
-                  border: "1px solid #4b5563",
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: 15,
-                    marginBottom: 4,
-                    fontWeight: 600,
-                  }}
-                >
-                  Waiting for Patcher
-                </h3>
-                <p style={{ fontSize: 14 }}>
-                  You’ll become the breaker again when{" "}
-                  <strong>{currentPatcherName || "your opponent"}</strong>{" "}
-                  finishes their patch.
-                </p>
-              </div>
             )}
 
             {/* === RESULT SCREENS — SHOWN ON BOTH DEVICES === */}
