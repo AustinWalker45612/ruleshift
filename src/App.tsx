@@ -93,10 +93,25 @@ type SyncedState = {
   sender?: string;
 };
 
+// Helper: parse initial room from URL like /room/ABCD
+const getInitialRoomFromUrl = (): string | null => {
+  if (typeof window === "undefined") return null;
+  const path = window.location.pathname || "/";
+  const segments = path.split("/").filter(Boolean); // remove empty strings
+  if (segments.length >= 2 && segments[0].toLowerCase() === "room") {
+    return segments[1].toUpperCase();
+  }
+  return null;
+};
+
 const App: React.FC = () => {
-  // Step 3: room selection
-  const [roomId, setRoomId] = useState<string | null>(null);
-  const [roomInput, setRoomInput] = useState<string>("");
+  // Step 3 + URL-based rooms: derive initial room from URL if present
+  const initialRoomFromUrl = getInitialRoomFromUrl();
+
+  const [roomId, setRoomId] = useState<string | null>(() => initialRoomFromUrl);
+  const [roomInput, setRoomInput] = useState<string>(
+    () => initialRoomFromUrl ?? ""
+  );
 
   // Step 4: persistent clientId per device (localStorage)
   const [clientId] = useState<string>(() => {
@@ -266,13 +281,19 @@ const App: React.FC = () => {
     };
   }, [isEndgameWindow, prevValidCodesCount, currentValidCount]);
 
-  // ---------- ROOM JOIN HANDLER (Step 3 + 4) ----------
+  // ---------- ROOM JOIN HANDLER (Step 3 + URL-based) ----------
   const handleJoinRoom = () => {
     const trimmed = roomInput.trim();
     if (!trimmed) return;
 
     const normalized = trimmed.toUpperCase();
     setRoomId(normalized);
+
+    // Update URL to /room/NORMALIZED so it can be shared
+    if (typeof window !== "undefined") {
+      const newUrl = `/room/${normalized}`;
+      window.history.pushState({}, "", newUrl);
+    }
   };
 
   // When we have a roomId, join it on the server and get a seat assigned
