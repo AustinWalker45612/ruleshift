@@ -1,0 +1,20 @@
+generator client {
+  provider     = "prisma-client-js"
+  output       = "../src/generated"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Player {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  clientId    String   @unique
+  name        String
+  totalXp     Int      @default(0)
+  duelsPlayed Int      @default(0)
+  duelsWon    Int      @default(0)
+}

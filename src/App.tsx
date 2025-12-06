@@ -1236,8 +1236,15 @@ const App: React.FC = () => {
 
     setPlayers(updatedPlayers);
 
+    // Broadcast new player names / ready state to the room
     broadcastState({
       players: updatedPlayers,
+    });
+
+    // Also persist this player to the backend DB
+    socket.emit("player:upsert", {
+      clientId,
+      name: rawName,
     });
   };
 

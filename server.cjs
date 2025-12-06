@@ -2,6 +2,21 @@
 const http = require("http");
 const { Server } = require("socket.io");
 
+// ---- Prisma setup (Prisma 7 + Postgres adapter) ----
+require("dotenv").config();
+const { PrismaClient } = require("@prisma/client");
+const { Pool } = require("pg");
+const { PrismaPg } = require("@prisma/adapter-pg");
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg(pool),
+});
+// ----------------------------------------------------
+
 const PORT = process.env.PORT || 4000;
 
 // How long a disconnected player keeps their seat reserved (ms)
@@ -210,6 +225,46 @@ io.on("connection", (socket) => {
   });
 
   /**
+   * player:upsert
+   * payload: { clientId, name }
+   *
+   * Save or update a player record in the database.
+   */
+  socket.on("player:upsert", async (payload) => {
+    try {
+      const { clientId, name } = payload || {};
+      if (!clientId || !name) return;
+
+      // We don't assume `name` is unique; we find by name if it exists.
+      const existing = await prisma.player.findFirst({
+        where: { name },
+      });
+
+      let player;
+      if (existing) {
+        player = await prisma.player.update({
+          where: { id: existing.id },
+          data: {
+            name,
+            // updatedAt is handled by @updatedAt in the schema if you have it
+          },
+        });
+      } else {
+        player = await prisma.player.create({
+          data: {
+            name,
+            // you can later add clientId or stats fields here
+          },
+        });
+      }
+
+      console.log("💾 Saved player:", player.id, player.name);
+    } catch (err) {
+      console.error("Error in player:upsert", err);
+    }
+  });
+
+  /**
    * game:state
    * payload: SyncedState (must include roomId)
    */
@@ -318,6 +373,20 @@ io.on("connection", (socket) => {
     }
   });
 });
+
+// Graceful shutdown
+async function shutdown() {
+  console.log("\n⏹️ Shutting down server…");
+  server.close(() => {
+    console.log("HTTP server closed.");
+  });
+  await prisma.$disconnect();
+  await pool.end();
+  process.exit(0);
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 // IMPORTANT: bind to 0.0.0.0 so phones on the same Wi-Fi can reach it
 server.listen(PORT, "0.0.0.0", () => {
