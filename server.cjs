@@ -15,145 +15,246 @@ const io = new Server(server, {
   },
 });
 
-// In-memory store of per-room game state
-// roomId (string) -> latest SyncedState for that room (without sender)
-const roomStates = new Map();
+/**
+ * In-memory per-room data:
+ * rooms = Map<roomId, {
+ *   latestState: object | null,
+ *   seats: {
+ *     0: { clientId: string, socketId: string, connected: boolean } | null,
+ *     1: { clientId: string, socketId: string, connected: boolean } | null,
+ *   },
+ *   spectators: Map<clientId, Set<socketId>>,
+ * }>
+ */
+const rooms = new Map();
 
-// In-memory mapping of which client occupies which seats in each room
-// roomId -> { seats: [clientId | null, clientId | null], spectators: Set<clientId> }
-const roomPlayers = new Map();
+/**
+ * Track which socket belongs to which (roomId, clientId, seatIndex)
+ * clientSessions = Map<socketId, { roomId, clientId, seatIndex: 0|1|null }>
+ */
+const clientSessions = new Map();
 
-// Track which socket belongs to which (roomId, clientId) for debugging / future cleanup
-// socket.id -> { roomId, clientId }
-const socketMeta = new Map();
+function getOrCreateRoom(roomId) {
+  if (!rooms.has(roomId)) {
+    rooms.set(roomId, {
+      latestState: null,
+      seats: {
+        0: null,
+        1: null,
+      },
+      spectators: new Map(),
+    });
+  }
+  return rooms.get(roomId);
+}
+
+function emitRoomPresence(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+
+  const seatsPayload = [0, 1].map((idx) => {
+    const seat = room.seats[idx];
+    if (!seat) {
+      return {
+        seatIndex: idx,
+        occupied: false,
+        clientId: null,
+        connected: false,
+      };
+    }
+    return {
+      seatIndex: idx,
+      occupied: true,
+      clientId: seat.clientId,
+      connected: seat.connected,
+    };
+  });
+
+  const spectatorsCount = room.spectators.size;
+
+  io.to(roomId).emit("room:presence", {
+    roomId,
+    seats: seatsPayload,
+    spectatorsCount,
+  });
+}
 
 io.on("connection", (socket) => {
   console.log("✅ Client connected:", socket.id);
 
-  // --- ROOM JOIN & SEAT ASSIGNMENT ---
+  // ---- ROOM JOIN + SEAT ASSIGNMENT ----
   socket.on("room:join", (payload) => {
-    if (!payload) return;
-
-    let { roomId, clientId } = payload;
+    const { roomId, clientId } = payload || {};
     if (!roomId || !clientId) {
-      console.log("⚠️ room:join missing roomId or clientId from", socket.id);
+      console.warn("⚠️ room:join missing roomId or clientId", payload);
       return;
     }
 
-    roomId = String(roomId);
-    clientId = String(clientId);
+    const normalizedRoomId = String(roomId).toUpperCase();
+    const room = getOrCreateRoom(normalizedRoomId);
 
-    console.log("🧩 room:join", { socketId: socket.id, roomId, clientId });
+    socket.join(normalizedRoomId);
 
-    socket.join(roomId);
-    socketMeta.set(socket.id, { roomId, clientId });
-
-    let info = roomPlayers.get(roomId);
-    if (!info) {
-      info = {
-        seats: [null, null], // index 0 → Player 1, index 1 → Player 2
-        spectators: new Set(),
-      };
-      roomPlayers.set(roomId, info);
-    }
-
+    // Try to reclaim existing seat for this clientId
     let seatIndex = null;
 
-    // If this clientId already has a seat, reuse it
-    if (info.seats[0] === clientId) {
-      seatIndex = 0;
-    } else if (info.seats[1] === clientId) {
-      seatIndex = 1;
-    } else if (!info.seats[0]) {
-      // First open seat: Player 1
-      info.seats[0] = clientId;
-      seatIndex = 0;
-    } else if (!info.seats[1]) {
-      // Second open seat: Player 2
-      info.seats[1] = clientId;
-      seatIndex = 1;
-    } else {
-      // No seats left → spectator
-      info.spectators.add(clientId);
-      seatIndex = null;
+    for (const idx of [0, 1]) {
+      const seat = room.seats[idx];
+      if (seat && seat.clientId === clientId) {
+        seatIndex = idx;
+        seat.socketId = socket.id;
+        seat.connected = true;
+        break;
+      }
     }
 
-    console.log(
-      "🎯 Assigned seat",
-      seatIndex,
-      "for clientId",
+    // If not already bound to a seat, assign first free seat
+    if (seatIndex === null) {
+      if (!room.seats[0]) {
+        seatIndex = 0;
+        room.seats[0] = {
+          clientId,
+          socketId: socket.id,
+          connected: true,
+        };
+      } else if (!room.seats[1]) {
+        seatIndex = 1;
+        room.seats[1] = {
+          clientId,
+          socketId: socket.id,
+          connected: true,
+        };
+      } else {
+        // No seats free -> spectator
+        seatIndex = null;
+        if (!room.spectators.has(clientId)) {
+          room.spectators.set(clientId, new Set());
+        }
+        room.spectators.get(clientId).add(socket.id);
+      }
+    }
+
+    clientSessions.set(socket.id, {
+      roomId: normalizedRoomId,
       clientId,
-      "in room",
-      roomId
+      seatIndex,
+    });
+
+    console.log(
+      `👥 room:join -> room=${normalizedRoomId}, clientId=${clientId}, seatIndex=${seatIndex}`
     );
 
+    // Tell this socket what seat it has
     socket.emit("room:joined", {
-      roomId,
+      roomId: normalizedRoomId,
       clientId,
-      seatIndex, // 0, 1, or null (spectator)
+      seatIndex,
     });
+
+    // Broadcast updated presence to everyone in the room
+    emitRoomPresence(normalizedRoomId);
+
+    // If we already have a latestState for this room, send it to the new client
+    const latestState = room.latestState;
+    if (latestState) {
+      socket.emit("game:state", {
+        ...latestState,
+        sender: undefined,
+      });
+    }
   });
 
-  // Client pushes a new game state snapshot
+  // ---- GAME STATE SNAPSHOTS (per-room) ----
   socket.on("game:state", (payload) => {
-    if (!payload) return;
+    const { roomId } = payload || {};
+    if (!roomId) {
+      console.warn("⚠️ game:state payload without roomId");
+      return;
+    }
 
-    const roomId =
-      payload && payload.roomId ? String(payload.roomId) : "default";
-    console.log("📩 Received game:state from", socket.id, "for room:", roomId);
+    const normalizedRoomId = String(roomId).toUpperCase();
+    const room = getOrCreateRoom(normalizedRoomId);
 
-    // Make sure this socket is in the room
-    socket.join(roomId);
+    console.log("📩 Received game:state from", socket.id, "for room", normalizedRoomId);
 
     // Store a clean copy as the "authoritative" latest state for this room
-    const latestStateForRoom = { ...payload };
-    delete latestStateForRoom.sender; // we don't persist sender
-    roomStates.set(roomId, latestStateForRoom);
+    const latestState = { ...payload };
+    delete latestState.sender;
+    room.latestState = latestState;
 
-    // Broadcast to all OTHER clients in this room only
-    socket.to(roomId).emit("game:state", {
+    // Broadcast to all OTHER clients in this room
+    socket.to(normalizedRoomId).emit("game:state", {
       ...payload,
       sender: socket.id,
     });
   });
 
-  // New/reconnected client asks for current state
+  // ---- STATE REQUEST (per-room) ----
   socket.on("game:requestState", (payload) => {
-    const roomId =
-      payload && payload.roomId ? String(payload.roomId) : "default";
+    const { roomId } = payload || {};
+    if (!roomId) {
+      console.warn("⚠️ game:requestState without roomId");
+      return;
+    }
+
+    const normalizedRoomId = String(roomId).toUpperCase();
+    const room = rooms.get(normalizedRoomId);
 
     console.log(
       "🔁",
       socket.id,
-      "requested latest game state for room:",
-      roomId
+      "requested latest game state for room",
+      normalizedRoomId
     );
 
-    // Make sure this socket is in the requested room
-    socket.join(roomId);
-
-    const latestStateForRoom = roomStates.get(roomId);
-    if (latestStateForRoom) {
-      // Send only to this socket
+    if (room && room.latestState) {
       socket.emit("game:state", {
-        ...latestStateForRoom,
+        ...room.latestState,
         sender: undefined,
       });
     } else {
       console.log(
-        "⚠️ No state stored yet for room",
-        roomId,
+        "⚠️ No latestState stored yet for room",
+        normalizedRoomId,
         "— probably pre-game"
       );
-      // It's fine to do nothing here; client will stay in initial UI state
     }
   });
 
+  // ---- DISCONNECT HANDLING + PRESENCE ----
   socket.on("disconnect", () => {
     console.log("❌ Client disconnected:", socket.id);
-    socketMeta.delete(socket.id);
-    // For now we keep seat assignments & roomStates so reconnects can reclaim them.
-    // Later we could add timeout-based cleanup if needed.
+    const session = clientSessions.get(socket.id);
+    if (!session) return;
+
+    const { roomId, clientId, seatIndex } = session;
+    const room = rooms.get(roomId);
+    if (!room) {
+      clientSessions.delete(socket.id);
+      return;
+    }
+
+    if (seatIndex === 0 || seatIndex === 1) {
+      const seat = room.seats[seatIndex];
+      if (seat && seat.socketId === socket.id) {
+        // Mark seat as disconnected but keep ownership (we'll decide about timeout/cleanup later)
+        seat.connected = false;
+      }
+    } else {
+      // Spectator: remove this socket from the spectator map
+      if (room.spectators.has(clientId)) {
+        const set = room.spectators.get(clientId);
+        set.delete(socket.id);
+        if (set.size === 0) {
+          room.spectators.delete(clientId);
+        }
+      }
+    }
+
+    clientSessions.delete(socket.id);
+
+    // Notify remaining sockets in the room
+    emitRoomPresence(roomId);
   });
 });
 

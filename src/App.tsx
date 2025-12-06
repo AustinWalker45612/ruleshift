@@ -58,8 +58,24 @@ type TemplateOptionSummary = {
 type PlayerSeat = 0 | 1 | null;
 
 /**
+ * Presence payload coming from the server.
+ */
+type SeatPresence = {
+  seatIndex: number;
+  occupied: boolean;
+  clientId: string | null;
+  connected: boolean;
+};
+
+type RoomPresence = {
+  roomId: string;
+  seats: SeatPresence[];
+  spectatorsCount: number;
+};
+
+/**
  * Everything that BOTH devices should stay in sync on.
- * (Per-device-only things like playerSeat, breakerError, etc. stay local.)
+ * (Per-device-only things like breakerError, etc. stay local.)
  */
 type SyncedState = {
   roomId?: string;
@@ -105,7 +121,7 @@ const getInitialRoomFromUrl = (): string | null => {
 };
 
 const App: React.FC = () => {
-  // Step 3 + URL-based rooms: derive initial room from URL if present
+  // URL-based rooms: derive initial room from URL if present
   const initialRoomFromUrl = getInitialRoomFromUrl();
 
   const [roomId, setRoomId] = useState<string | null>(() => initialRoomFromUrl);
@@ -113,7 +129,7 @@ const App: React.FC = () => {
     () => initialRoomFromUrl ?? ""
   );
 
-  // Step 4: persistent clientId per device (localStorage)
+  // Persistent clientId per device (localStorage)
   const [clientId] = useState<string>(() => {
     try {
       const key = "ruleshiftClientId";
@@ -139,6 +155,9 @@ const App: React.FC = () => {
 
   // Which seat this browser is controlling: Player 1 (0) or Player 2 (1), or spectator (null)
   const [playerSeat, setPlayerSeat] = useState<PlayerSeat>(null);
+
+  // Room presence (connections, spectators)
+  const [roomPresence, setRoomPresence] = useState<RoomPresence | null>(null);
 
   const [players, setPlayers] = useState<Player[]>([
     { name: "", ready: false },
@@ -281,13 +300,14 @@ const App: React.FC = () => {
     };
   }, [isEndgameWindow, prevValidCodesCount, currentValidCount]);
 
-  // ---------- ROOM JOIN HANDLER (Step 3 + URL-based) ----------
+  // ---------- ROOM JOIN HANDLER ----------
   const handleJoinRoom = () => {
     const trimmed = roomInput.trim();
     if (!trimmed) return;
 
     const normalized = trimmed.toUpperCase();
     setRoomId(normalized);
+    setRoomPresence(null);
 
     // Update URL to /room/NORMALIZED so it can be shared
     if (typeof window !== "undefined") {
@@ -320,6 +340,21 @@ const App: React.FC = () => {
       socket.off("room:joined", handleJoined);
     };
   }, [roomId, clientId]);
+
+  // ---------- PRESENCE LISTENER ----------
+  useEffect(() => {
+    if (!roomId) return;
+
+    const handlePresence = (data: RoomPresence) => {
+      if (!data || data.roomId !== roomId) return;
+      setRoomPresence(data);
+    };
+
+    socket.on("room:presence", handlePresence);
+    return () => {
+      socket.off("room:presence", handlePresence);
+    };
+  }, [roomId]);
 
   // ---------- SOCKET BROADCAST HELPER ----------
   const broadcastState = (overrides: Partial<SyncedState> = {}) => {
@@ -1161,6 +1196,13 @@ const App: React.FC = () => {
   const isBreakerHere =
     !isSpectator && playerSeat === currentBreakerIndex;
 
+  // Presence helpers
+  const seat0 = roomPresence?.seats?.find((s) => s.seatIndex === 0);
+  const seat1 = roomPresence?.seats?.find((s) => s.seatIndex === 1);
+  const seat0Connected = !!seat0?.connected;
+  const seat1Connected = !!seat1?.connected;
+  const spectatorsCount = roomPresence?.spectatorsCount ?? 0;
+
   // --- name confirm handler for this browser's seat ---
   const handleConfirmName = () => {
     if (isSpectator || playerSeat === null) return;
@@ -1357,6 +1399,40 @@ const App: React.FC = () => {
           </span>
         </p>
 
+        {roomPresence && (
+          <p
+            style={{
+              textAlign: "center",
+              marginBottom: 16,
+              fontSize: 11,
+              opacity: 0.8,
+            }}
+          >
+            Connections — P1:{" "}
+            <span style={{ color: seat0Connected ? "#4ade80" : "#f97373" }}>
+              {seat0Connected ? "online" : "offline"}
+            </span>{" "}
+            · P2:{" "}
+            <span style={{ color: seat1Connected ? "#4ade80" : "#f97373" }}>
+              {seat1Connected ? "online" : "offline"}
+            </span>{" "}
+            · Spectators: {spectatorsCount}
+          </p>
+        )}
+
+        {!roomPresence && (
+          <p
+            style={{
+              textAlign: "center",
+              marginBottom: 16,
+              fontSize: 11,
+              opacity: 0.6,
+            }}
+          >
+            Connecting players…
+          </p>
+        )}
+
         <p
           style={{
             textAlign: "center",
@@ -1469,14 +1545,34 @@ const App: React.FC = () => {
                     <strong>
                       {players[0].name || "(not set yet)"}{" "}
                       {players[0].ready ? "✓" : ""}
-                    </strong>
+                    </strong>{" "}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        opacity: 0.8,
+                        marginLeft: 4,
+                        color: seat0Connected ? "#4ade80" : "#f97373",
+                      }}
+                    >
+                      {seat0Connected ? "online" : "offline"}
+                    </span>
                   </div>
                   <div>
                     Player 2:{" "}
                     <strong>
                       {players[1].name || "(not set yet)"}{" "}
                       {players[1].ready ? "✓" : ""}
-                    </strong>
+                    </strong>{" "}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        opacity: 0.8,
+                        marginLeft: 4,
+                        color: seat1Connected ? "#4ade80" : "#f97373",
+                      }}
+                    >
+                      {seat1Connected ? "online" : "offline"}
+                    </span>
                   </div>
                 </div>
 
@@ -1547,14 +1643,34 @@ const App: React.FC = () => {
                     <strong>
                       {players[0].name || "(not set yet)"}{" "}
                       {players[0].ready ? "✓" : ""}
-                    </strong>
+                    </strong>{" "}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        opacity: 0.8,
+                        marginLeft: 4,
+                        color: seat0Connected ? "#4ade80" : "#f97373",
+                      }}
+                    >
+                      {seat0Connected ? "online" : "offline"}
+                    </span>
                   </div>
                   <div>
                     Player 2:{" "}
                     <strong>
                       {players[1].name || "(not set yet)"}{" "}
                       {players[1].ready ? "✓" : ""}
-                    </strong>
+                    </strong>{" "}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        opacity: 0.8,
+                        marginLeft: 4,
+                        color: seat1Connected ? "#4ade80" : "#f97373",
+                      }}
+                    >
+                      {seat1Connected ? "online" : "offline"}
+                    </span>
                   </div>
                 </div>
 
