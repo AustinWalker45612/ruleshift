@@ -1591,19 +1591,24 @@ const App: React.FC = () => {
             )}
 
             {/* === DUEL HISTORY — SHOWN ON BOTH DEVICES === */}
-            {rounds.length > 0 && (
-              <div
-                style={{
-                  background: "#020617",
-                  padding: 12,
-                  borderRadius: 12,
-                  border: "1px solid #1f2937",
-                  fontSize: 12,
-                  marginTop: 16,
-                }}
-              >
-                <h3 style={{ marginBottom: 8, fontSize: 13 }}>Duel History</h3>
-                {rounds.map((r) => (
+            <div
+              style={{
+                background: "#020617",
+                padding: 12,
+                borderRadius: 12,
+                border: "1px solid #1f2937",
+                fontSize: 12,
+                marginTop: 16,
+              }}
+            >
+              <h3 style={{ marginBottom: 8, fontSize: 13 }}>Duel History</h3>
+
+              {rounds.length === 0 ? (
+                <p style={{ opacity: 0.6, fontSize: 12 }}>
+                  Once you get further into the duel, completed rounds will appear here.
+                </p>
+              ) : (
+                rounds.map((r) => (
                   <div
                     key={r.roundNumber}
                     style={{
@@ -1619,27 +1624,28 @@ const App: React.FC = () => {
                     <div>Code: {r.secretCode}</div>
                     <div style={{ opacity: 0.8 }}>Rule: {r.ruleText}</div>
                   </div>
-                ))}
+                ))
+              )}
 
-                <button
-                  onClick={handleRestartDuel}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "8px 16px",
-                    borderRadius: 999,
-                    border: "1px solid #4b5563",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    background: "transparent",
-                    color: "#9ca3af",
-                    marginTop: 8,
-                  }}
-                >
-                  Restart Duel
-                </button>
-              </div>
-            )}
+              {/* Restart button stays the same */}
+              <button
+                onClick={handleRestartDuel}
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "8px 16px",
+                  borderRadius: 999,
+                  border: "1px solid #4b5563",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  background: "transparent",
+                  color: "#9ca3af",
+                  marginTop: 8,
+                }}
+              >
+                Restart Duel
+              </button>
+            </div>
           </>
         )}
       </div>
