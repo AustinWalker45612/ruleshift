@@ -47,6 +47,12 @@ type Round = {
   guesses: Guess[];
 };
 
+// Rule template snapshot shown to the Breaker for this patch round
+type TemplateOptionSummary = {
+  value: RuleTemplate;
+  label: string;
+};
+
 // Which seat this browser is playing as (or none yet)
 type PlayerSeat = 0 | 1 | null;
 
@@ -77,6 +83,9 @@ type SyncedState = {
   lastGuessValue: string | null;
   lastBreakerPoints: number | null;
   lastPatcherPoints: number | null;
+
+  // NEW: which templates were available when the last patch was made
+  templatesAvailableForCurrentRound: TemplateOptionSummary[];
 
   sender?: string;
 };
@@ -166,6 +175,10 @@ const App: React.FC = () => {
     null
   );
 
+  // NEW: templates that were available when the current patch was made
+  const [templatesAvailableForCurrentRound, setTemplatesAvailableForCurrentRound] =
+    useState<TemplateOptionSummary[]>([]);
+
   const currentPatcher = players[currentPatcherIndex];
   const currentBreakerIndex = 1 - currentPatcherIndex;
   const currentBreaker = players[currentBreakerIndex];
@@ -243,6 +256,7 @@ const App: React.FC = () => {
       lastGuessValue,
       lastBreakerPoints,
       lastPatcherPoints,
+      templatesAvailableForCurrentRound,
       sender: socket.id,
       ...overrides,
     };
@@ -278,6 +292,10 @@ const App: React.FC = () => {
       setLastGuessValue(remote.lastGuessValue);
       setLastBreakerPoints(remote.lastBreakerPoints);
       setLastPatcherPoints(remote.lastPatcherPoints);
+
+      setTemplatesAvailableForCurrentRound(
+        remote.templatesAvailableForCurrentRound || []
+      );
     };
 
     socket.on("game:state", handler);
@@ -359,6 +377,7 @@ const App: React.FC = () => {
     setLastGuessValue(null);
     setLastBreakerPoints(null);
     setLastPatcherPoints(null);
+    setTemplatesAvailableForCurrentRound([]);
   };
 
   const startGame = () => {
@@ -399,6 +418,7 @@ const App: React.FC = () => {
       lastGuessValue: null,
       lastBreakerPoints: null,
       lastPatcherPoints: null,
+      templatesAvailableForCurrentRound: [],
     });
   };
 
@@ -414,6 +434,9 @@ const App: React.FC = () => {
       );
       return;
     }
+
+    // Snapshot of the templates the Patcher COULD choose right now
+    const templatesAtPatchTime = getAvailableTemplateOptions(rules);
 
     let newRule: Rule;
     let description: string;
@@ -700,6 +723,10 @@ const App: React.FC = () => {
     setRules(candidateRules);
     setNextRuleId((prev) => prev + 1);
     setPatcherRuleError(null);
+
+    // Store & sync the snapshot of templates that were available this patch
+    setTemplatesAvailableForCurrentRound(templatesAtPatchTime);
+
     setPhase("breakerTurn");
 
     broadcastState({
@@ -707,6 +734,7 @@ const App: React.FC = () => {
       patcherRuleText: description,
       rules: candidateRules,
       phase: "breakerTurn",
+      templatesAvailableForCurrentRound: templatesAtPatchTime,
     });
   };
 
@@ -820,6 +848,11 @@ const App: React.FC = () => {
           setBreakerError(
             `❌ Invalid: this guess breaks at least one active rule. Endgame attempts left: ${newAttempts}.`
           );
+
+          // NEW: broadcast the updated attempts so spectator sees countdown
+          broadcastState({
+            endgameAttemptsLeft: newAttempts,
+          });
         }
       } else {
         setBreakerError(
@@ -963,6 +996,7 @@ const App: React.FC = () => {
       lastGuessValue: null,
       lastBreakerPoints: null,
       lastPatcherPoints: null,
+      templatesAvailableForCurrentRound: [],
     });
   };
 
@@ -1008,6 +1042,7 @@ const App: React.FC = () => {
       endgameBaseAttempts: 0,
       endgameBonusAttempts: 0,
       prevValidCodesCount: null,
+      templatesAvailableForCurrentRound: [],
     });
   };
 
@@ -1499,6 +1534,9 @@ const App: React.FC = () => {
                 validCodes={validCodes}
                 visibleRules={visibleRules}
                 validCodesCount={currentValidCount}
+                availableTemplatesForThisPatchRound={
+                  templatesAvailableForCurrentRound
+                }
               />
             )}
 
@@ -1527,6 +1565,9 @@ const App: React.FC = () => {
                     validCodes={validCodes}
                     visibleRules={visibleRules}
                     validCodesCount={currentValidCount}
+                    availableTemplatesForThisPatchRound={
+                      templatesAvailableForCurrentRound
+                    }
                   />
                 ) : (
                   <div

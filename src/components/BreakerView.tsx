@@ -1,7 +1,11 @@
 import React from "react";
-import type { Rule, Player, Guess } from "../game/gameTypes";
-import { templateOptions } from "../game/ruleTemplates";
+import type { Rule, Player, Guess, RuleTemplate } from "../game/gameTypes";
 import { ActiveRulesPanel } from "./ActiveRulesPanel";
+
+type TemplateOptionSummary = {
+  value: RuleTemplate;
+  label: string;
+};
 
 type BreakerViewProps = {
   mode: "host" | "phone";
@@ -28,7 +32,10 @@ type BreakerViewProps = {
   visibleRules: Rule[];
   validCodesCount: number;
 
-  // NEW: if true, this is a spectator view (no input / no submit)
+  // NEW: only templates that were available to the Patcher this round
+  availableTemplatesForThisPatchRound: TemplateOptionSummary[];
+
+  // if true, this is a spectator view (no input / no submit)
   readOnly?: boolean;
 };
 
@@ -51,6 +58,7 @@ export const BreakerView: React.FC<BreakerViewProps> = ({
   validCodes,
   visibleRules,
   validCodesCount,
+  availableTemplatesForThisPatchRound,
   readOnly,
 }) => {
   const isPhone = mode === "phone";
@@ -330,32 +338,35 @@ export const BreakerView: React.FC<BreakerViewProps> = ({
         </div>
       )}
 
-      {/* Collapsible list of all possible rule templates for the Breaker */}
-      <details
-        style={{
-          marginTop: 12,
-          fontSize: 12,
-          background: "#020617",
-          borderRadius: 8,
-          border: "1px solid #1f2937",
-          padding: 8,
-        }}
-      >
-        <summary style={{ cursor: "pointer" }}>
-          All possible rule types (for reference)
-        </summary>
-        <p style={{ opacity: 0.75, margin: "8px 0 6px" }}>
-          These are the rule templates the Patcher can draw from across the
-          duel (not all of them are active right now).
-        </p>
-        <ul style={{ listStyle: "none", paddingLeft: 0 }}>
-          {templateOptions.map((opt) => (
-            <li key={opt.value} style={{ marginBottom: 2 }}>
-              • {opt.label}
-            </li>
-          ))}
-        </ul>
-      </details>
+      {/* Rule templates that were available to the Patcher THIS round */}
+      {availableTemplatesForThisPatchRound.length > 0 && (
+        <details
+          style={{
+            marginTop: 12,
+            fontSize: 12,
+            background: "#020617",
+            borderRadius: 8,
+            border: "1px solid #1f2937",
+            padding: 8,
+          }}
+        >
+          <summary style={{ cursor: "pointer" }}>
+            Rule templates Patcher could use this round
+          </summary>
+          <p style={{ opacity: 0.75, margin: "8px 0 6px" }}>
+            These are the rule templates that were available to the Patcher when
+            they added their hidden rule this round. One of them is now in play
+            — but you don&apos;t know which.
+          </p>
+          <ul style={{ listStyle: "none", paddingLeft: 0 }}>
+            {availableTemplatesForThisPatchRound.map((opt) => (
+              <li key={opt.value} style={{ marginBottom: 2 }}>
+                • {opt.label}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 };
