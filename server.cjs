@@ -4,333 +4,318 @@ const { Server } = require("socket.io");
 
 const PORT = process.env.PORT || 4000;
 
-// How long we keep a seat reserved after disconnect (in ms)
-const DISCONNECT_GRACE_MS = 90_000; // 90 seconds
+// How long a disconnected player keeps their seat reserved (ms)
+const DISCONNECT_GRACE_MS = 60 * 1000; // 1 minute
 
-// Create bare HTTP server (no Express needed)
+// How long an empty/inactive room lives before being cleaned up (ms)
+const ROOM_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+
+// How often to sweep for expired rooms (ms)
+const ROOM_SWEEP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+// Create bare HTTP server
 const server = http.createServer();
 
 // Socket.IO instance
 const io = new Server(server, {
   cors: {
-    origin: "*", // fine for dev; you can lock this down later to your frontend URL
+    origin: "*", // fine for dev; later restrict to frontend origin
     methods: ["GET", "POST"],
   },
 });
 
 /**
- * In-memory per-room data:
- * rooms = Map<roomId, {
- *   latestState: object | null,
- *   seats: {
- *     0: {
- *       clientId: string,
- *       socketId: string | null,
- *       connected: boolean,
- *       disconnectedAt?: number,
- *       disconnectTimer?: NodeJS.Timeout
- *     } | null,
- *     1: same,
- *   },
- *   spectators: Map<clientId, Set<socketId>>,
- * }>
+ * rooms: Map<roomId, Room>
+ *
+ * Room = {
+ *   roomId: string,
+ *   state: SyncedState | null,
+ *   seats: [
+ *     { clientId, socketId, connected, disconnectTimer },
+ *     { clientId, socketId, connected, disconnectTimer },
+ *   ],
+ *   spectators: Map<clientId, { socketId, connected }>,
+ *   lastActivity: number,
+ * }
  */
 const rooms = new Map();
 
 /**
- * Track which socket belongs to which (roomId, clientId, seatIndex)
- * clientSessions = Map<socketId, { roomId, clientId, seatIndex: 0|1|null }>
+ * Ensure a room object exists and bump its lastActivity.
  */
-const clientSessions = new Map();
-
 function getOrCreateRoom(roomId) {
-  if (!rooms.has(roomId)) {
-    rooms.set(roomId, {
-      latestState: null,
-      seats: {
-        0: null,
-        1: null,
-      },
-      spectators: new Map(),
-    });
-  }
-  return rooms.get(roomId);
-}
-
-function emitRoomPresence(roomId) {
-  const room = rooms.get(roomId);
-  if (!room) return;
-
-  const seatsPayload = [0, 1].map((idx) => {
-    const seat = room.seats[idx];
-    if (!seat) {
-      return {
-        seatIndex: idx,
-        occupied: false,
-        clientId: null,
-        connected: false,
-      };
-    }
-    return {
-      seatIndex: idx,
-      occupied: true,
-      clientId: seat.clientId,
-      connected: seat.connected,
+  let room = rooms.get(roomId);
+  if (!room) {
+    room = {
+      roomId,
+      state: null,
+      seats: [
+        {
+          clientId: null,
+          socketId: null,
+          connected: false,
+          disconnectTimer: null,
+        },
+        {
+          clientId: null,
+          socketId: null,
+          connected: false,
+          disconnectTimer: null,
+        },
+      ],
+      spectators: new Map(), // clientId -> { socketId, connected }
+      lastActivity: Date.now(),
     };
-  });
-
-  const spectatorsCount = room.spectators.size;
-
-  io.to(roomId).emit("room:presence", {
-    roomId,
-    seats: seatsPayload,
-    spectatorsCount,
-  });
+    rooms.set(roomId, room);
+    console.log(`🆕 Created room ${roomId}`);
+  } else {
+    room.lastActivity = Date.now();
+  }
+  return room;
 }
 
 /**
- * Start or restart a disconnect timeout for a given seat.
- * After DISCONNECT_GRACE_MS, if the seat is still disconnected for the same client,
- * we free the seat.
+ * Broadcast presence info for a room to all sockets in that room.
  */
-function startSeatDisconnectTimer(roomId, seatIndex, clientId) {
+function broadcastPresence(roomId) {
   const room = rooms.get(roomId);
   if (!room) return;
-  const seat = room.seats[seatIndex];
-  if (!seat || seat.clientId !== clientId) return;
 
-  // Clear any existing timer first
-  if (seat.disconnectTimer) {
-    clearTimeout(seat.disconnectTimer);
-    seat.disconnectTimer = undefined;
-  }
+  const payload = {
+    roomId,
+    seats: room.seats.map((seat, index) => ({
+      seatIndex: index,
+      occupied: !!seat.clientId,
+      clientId: seat.clientId,
+      connected: !!seat.connected,
+    })),
+    spectatorsCount: room.spectators.size,
+  };
 
-  seat.disconnectedAt = Date.now();
+  io.to(roomId).emit("room:presence", payload);
+}
 
-  const timer = setTimeout(() => {
-    const currentRoom = rooms.get(roomId);
-    if (!currentRoom) return;
-    const currentSeat = currentRoom.seats[seatIndex];
+/**
+ * Periodic cleanup of rooms with no active connections and long inactivity.
+ */
+function cleanupExpiredRooms() {
+  const now = Date.now();
 
-    // If seat was freed or taken by someone else, do nothing
-    if (!currentSeat || currentSeat.clientId !== clientId) return;
-
-    // If they reconnected, connected will be true
-    if (currentSeat.connected) return;
-
-    // Final safety check on time elapsed
-    const elapsed = Date.now() - (currentSeat.disconnectedAt || 0);
-    if (elapsed < DISCONNECT_GRACE_MS) return;
-
-    console.log(
-      `⏱️  Seat timeout: freeing seat ${seatIndex} in room ${roomId} (clientId=${clientId})`
+  for (const [roomId, room] of rooms.entries()) {
+    const anySeatConnected = room.seats.some((s) => s.connected);
+    const anySpectatorConnected = Array.from(room.spectators.values()).some(
+      (s) => s.connected
     );
 
-    // Free the seat
-    currentRoom.seats[seatIndex] = null;
-    emitRoomPresence(roomId);
-  }, DISCONNECT_GRACE_MS);
+    if (!anySeatConnected && !anySpectatorConnected) {
+      const age = now - room.lastActivity;
+      if (age > ROOM_EXPIRY_MS) {
+        // Clear any pending disconnect timers
+        room.seats.forEach((seat) => {
+          if (seat.disconnectTimer) {
+            clearTimeout(seat.disconnectTimer);
+          }
+        });
 
-  seat.disconnectTimer = timer;
+        rooms.delete(roomId);
+        console.log(
+          `🧹 Removed inactive room ${roomId} (no connections for ${Math.round(
+            age / 60000
+          )} minutes)`
+        );
+      }
+    }
+  }
 }
+
+setInterval(cleanupExpiredRooms, ROOM_SWEEP_INTERVAL_MS);
 
 io.on("connection", (socket) => {
   console.log("✅ Client connected:", socket.id);
 
-  // ---- ROOM JOIN + SEAT ASSIGNMENT ----
+  /**
+   * room:join
+   * payload: { roomId, clientId }
+   *
+   * Assign a seat if possible; otherwise mark as spectator.
+   */
   socket.on("room:join", (payload) => {
-    const { roomId, clientId } = payload || {};
-    if (!roomId || !clientId) {
-      console.warn("⚠️ room:join missing roomId or clientId", payload);
-      return;
-    }
+    if (!payload) return;
+    let { roomId, clientId } = payload;
+    if (!roomId || !clientId) return;
 
-    const normalizedRoomId = String(roomId).toUpperCase();
-    const room = getOrCreateRoom(normalizedRoomId);
+    roomId = String(roomId).toUpperCase();
+    clientId = String(clientId);
 
-    socket.join(normalizedRoomId);
+    const room = getOrCreateRoom(roomId);
 
-    // Try to reclaim existing seat for this clientId
-    let seatIndex = null;
+    // Join Socket.IO room for scoping events
+    socket.join(roomId);
 
-    for (const idx of [0, 1]) {
-      const seat = room.seats[idx];
-      if (seat && seat.clientId === clientId) {
-        seatIndex = idx;
-        seat.socketId = socket.id;
-        seat.connected = true;
-        seat.disconnectedAt = undefined;
-
-        // Clear any pending disconnect timer
-        if (seat.disconnectTimer) {
-          clearTimeout(seat.disconnectTimer);
-          seat.disconnectTimer = undefined;
-        }
-        break;
-      }
-    }
-
-    // If not already bound to a seat, assign first free seat
-    if (seatIndex === null) {
-      if (!room.seats[0]) {
-        seatIndex = 0;
-        room.seats[0] = {
-          clientId,
-          socketId: socket.id,
-          connected: true,
-          disconnectedAt: undefined,
-          disconnectTimer: undefined,
-        };
-      } else if (!room.seats[1]) {
-        seatIndex = 1;
-        room.seats[1] = {
-          clientId,
-          socketId: socket.id,
-          connected: true,
-          disconnectedAt: undefined,
-          disconnectTimer: undefined,
-        };
-      } else {
-        // No seats free -> spectator
-        seatIndex = null;
-        if (!room.spectators.has(clientId)) {
-          room.spectators.set(clientId, new Set());
-        }
-        room.spectators.get(clientId).add(socket.id);
-      }
-    }
-
-    clientSessions.set(socket.id, {
-      roomId: normalizedRoomId,
-      clientId,
-      seatIndex,
-    });
-
-    console.log(
-      `👥 room:join -> room=${normalizedRoomId}, clientId=${clientId}, seatIndex=${seatIndex}`
+    // Check if this client already owns a seat in this room
+    let seatIndex = room.seats.findIndex(
+      (seat) => seat.clientId === clientId
     );
 
-    // Tell this socket what seat it has
+    // If not, see if we can assign a free seat
+    if (seatIndex === -1) {
+      if (!room.seats[0].clientId) {
+        seatIndex = 0;
+      } else if (!room.seats[1].clientId) {
+        seatIndex = 1;
+      }
+    }
+
+    if (seatIndex === -1) {
+      // Both seats taken → client is a spectator
+      room.spectators.set(clientId, {
+        socketId: socket.id,
+        connected: true,
+      });
+      console.log(
+        `👀 Client ${clientId} joined room ${roomId} as spectator (socket ${socket.id})`
+      );
+    } else {
+      const seat = room.seats[seatIndex];
+
+      // Assign/refresh this seat
+      seat.clientId = clientId;
+      seat.socketId = socket.id;
+      seat.connected = true;
+
+      // Cancel any disconnect timer for this seat
+      if (seat.disconnectTimer) {
+        clearTimeout(seat.disconnectTimer);
+        seat.disconnectTimer = null;
+      }
+
+      console.log(
+        `🎮 Client ${clientId} joined room ${roomId} as Player ${
+          seatIndex + 1
+        } (socket ${socket.id})`
+      );
+    }
+
+    room.lastActivity = Date.now();
+
+    // Notify this socket which seat it got (or null if spectator)
     socket.emit("room:joined", {
-      roomId: normalizedRoomId,
+      roomId,
       clientId,
-      seatIndex,
+      seatIndex: seatIndex === -1 ? null : seatIndex,
     });
 
-    // Broadcast updated presence to everyone in the room
-    emitRoomPresence(normalizedRoomId);
-
-    // If we already have a latestState for this room, send it to the new client
-    const latestState = room.latestState;
-    if (latestState) {
-      socket.emit("game:state", {
-        ...latestState,
-        sender: undefined,
-      });
-    }
+    // Broadcast updated presence
+    broadcastPresence(roomId);
   });
 
-  // ---- GAME STATE SNAPSHOTS (per-room) ----
+  /**
+   * game:state
+   * payload: SyncedState (must include roomId)
+   */
   socket.on("game:state", (payload) => {
-    const { roomId } = payload || {};
-    if (!roomId) {
-      console.warn("⚠️ game:state payload without roomId");
-      return;
-    }
+    if (!payload || !payload.roomId) return;
 
-    const normalizedRoomId = String(roomId).toUpperCase();
-    const room = getOrCreateRoom(normalizedRoomId);
+    const roomId = String(payload.roomId).toUpperCase();
+    const room = getOrCreateRoom(roomId);
 
-    console.log(
-      "📩 Received game:state from",
-      socket.id,
-      "for room",
-      normalizedRoomId
-    );
+    console.log("📩 Received game:state from", socket.id, "for room", roomId);
 
-    // Store a clean copy as the "authoritative" latest state for this room
-    const latestState = { ...payload };
-    delete latestState.sender;
-    room.latestState = latestState;
+    // Store a clean copy of the state (without sender) as authoritative
+    const cleanState = { ...payload };
+    delete cleanState.sender;
+    room.state = cleanState;
+    room.lastActivity = Date.now();
 
-    // Broadcast to all OTHER clients in this room
-    socket.to(normalizedRoomId).emit("game:state", {
+    // Broadcast to other clients in this room only
+    socket.to(roomId).emit("game:state", {
       ...payload,
       sender: socket.id,
     });
   });
 
-  // ---- STATE REQUEST (per-room) ----
+  /**
+   * game:requestState
+   * payload: { roomId }
+   */
   socket.on("game:requestState", (payload) => {
-    const { roomId } = payload || {};
-    if (!roomId) {
-      console.warn("⚠️ game:requestState without roomId");
-      return;
-    }
+    if (!payload || !payload.roomId) return;
+    const roomId = String(payload.roomId).toUpperCase();
+    const room = rooms.get(roomId);
 
-    const normalizedRoomId = String(roomId).toUpperCase();
-    const room = rooms.get(normalizedRoomId);
+    console.log("🔁", socket.id, "requested latest game state for room", roomId);
 
-    console.log(
-      "🔁",
-      socket.id,
-      "requested latest game state for room",
-      normalizedRoomId
-    );
-
-    if (room && room.latestState) {
+    if (room && room.state) {
+      room.lastActivity = Date.now();
       socket.emit("game:state", {
-        ...room.latestState,
+        ...room.state,
         sender: undefined,
       });
     } else {
       console.log(
-        "⚠️ No latestState stored yet for room",
-        normalizedRoomId,
-        "— probably pre-game"
+        `⚠️ No stored state for room ${roomId} yet — probably pre-game or brand new room`
       );
     }
   });
 
-  // ---- DISCONNECT HANDLING + PRESENCE ----
+  /**
+   * Handle disconnect: mark seats/spectators disconnected and start grace timer
+   * before freeing seats.
+   */
   socket.on("disconnect", () => {
     console.log("❌ Client disconnected:", socket.id);
-    const session = clientSessions.get(socket.id);
-    if (!session) return;
 
-    const { roomId, clientId, seatIndex } = session;
-    const room = rooms.get(roomId);
-    if (!room) {
-      clientSessions.delete(socket.id);
-      return;
-    }
+    const now = Date.now();
 
-    if (seatIndex === 0 || seatIndex === 1) {
-      const seat = room.seats[seatIndex];
-      if (seat && seat.socketId === socket.id) {
-        // Mark seat as disconnected but keep ownership for a grace period
-        seat.connected = false;
-        seat.socketId = null;
-        console.log(
-          `🔌 Seat ${seatIndex} in room ${roomId} disconnected for clientId=${clientId}, starting grace timer`
-        );
-        startSeatDisconnectTimer(roomId, seatIndex, clientId);
-      }
-    } else {
-      // Spectator: remove this socket from the spectator map
-      if (room.spectators.has(clientId)) {
-        const set = room.spectators.get(clientId);
-        set.delete(socket.id);
-        if (set.size === 0) {
+    for (const [roomId, room] of rooms.entries()) {
+      let presenceChanged = false;
+
+      // Check if this socket was occupying a seat
+      room.seats.forEach((seat, index) => {
+        if (seat.socketId === socket.id) {
+          // Mark disconnected but keep the clientId for a grace period
+          seat.connected = false;
+          seat.socketId = null;
+
+          // If there was an existing timer, cancel and replace
+          if (seat.disconnectTimer) {
+            clearTimeout(seat.disconnectTimer);
+          }
+
+          seat.disconnectTimer = setTimeout(() => {
+            const r = rooms.get(roomId);
+            if (!r) return;
+            const s = r.seats[index];
+
+            // Only free if they didn't reconnect in the meantime
+            if (!s.connected) {
+              console.log(
+                `⏱️ Freeing seat ${index} in room ${roomId} after disconnect grace`
+              );
+              s.clientId = null;
+              s.socketId = null;
+              s.disconnectTimer = null;
+              broadcastPresence(roomId);
+            }
+          }, DISCONNECT_GRACE_MS);
+
+          presenceChanged = true;
+        }
+      });
+
+      // Check if this socket was a spectator
+      for (const [clientId, spec] of room.spectators.entries()) {
+        if (spec.socketId === socket.id) {
           room.spectators.delete(clientId);
+          presenceChanged = true;
         }
       }
+
+      if (presenceChanged) {
+        room.lastActivity = now;
+        broadcastPresence(roomId);
+      }
     }
-
-    clientSessions.delete(socket.id);
-
-    // Notify remaining sockets in the room
-    emitRoomPresence(roomId);
   });
 });
 

@@ -120,17 +120,30 @@ const getInitialRoomFromUrl = (): string | null => {
   return null;
 };
 
+// Helper: generate a random room ID (5 chars, no confusing chars)
+const generateRoomId = (): string => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I/O/1/0
+  let id = "";
+  for (let i = 0; i < 5; i++) {
+    id += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return id;
+};
+
 const App: React.FC = () => {
-  // URL-based rooms: derive initial room from URL if present
-  const initialRoomFromUrl = getInitialRoomFromUrl();
+  // Room ID is either taken from the URL (/room/ABCD) or auto-generated
+  const [roomId] = useState<string>(() => {
+    const fromUrl = getInitialRoomFromUrl();
+    if (fromUrl) return fromUrl;
 
-  const [roomId, setRoomId] = useState<string | null>(() => initialRoomFromUrl);
-  const [roomInput, setRoomInput] = useState<string>(
-    () => initialRoomFromUrl ?? ""
-  );
-
-  // Feedback when copying the room link
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+    const newId = generateRoomId();
+    if (typeof window !== "undefined") {
+      const newUrl = `/room/${newId}`;
+      // Use replaceState so back button doesn't go to a "roomless" URL
+      window.history.replaceState({}, "", newUrl);
+    }
+    return newId;
+  });
 
   // Persistent clientId per device (localStorage)
   const [clientId] = useState<string>(() => {
@@ -303,48 +316,6 @@ const App: React.FC = () => {
     };
   }, [isEndgameWindow, prevValidCodesCount, currentValidCount]);
 
-  // ---------- ROOM JOIN HANDLER ----------
-  const handleJoinRoom = () => {
-    const trimmed = roomInput.trim();
-    if (!trimmed) return;
-
-    const normalized = trimmed.toUpperCase();
-    setRoomId(normalized);
-    setRoomPresence(null);
-
-    // Update URL to /room/NORMALIZED so it can be shared
-    if (typeof window !== "undefined") {
-      const newUrl = `/room/${normalized}`;
-      window.history.pushState({}, "", newUrl);
-    }
-  };
-
-  // Copy room link to clipboard
-  const handleCopyRoomLink = async () => {
-    if (!roomId || typeof window === "undefined") return;
-    const url = `${window.location.origin}/room/${roomId}`;
-
-    try {
-      if (
-        typeof navigator !== "undefined" &&
-        navigator.clipboard &&
-        "writeText" in navigator.clipboard
-      ) {
-        await navigator.clipboard.writeText(url);
-        setCopyFeedback("Link copied!");
-      } else {
-        // Fallback: select-able URL in feedback
-        setCopyFeedback("Copy not supported here — use the address bar.");
-      }
-    } catch {
-      setCopyFeedback("Copy failed — use the address bar instead.");
-    }
-
-    setTimeout(() => {
-      setCopyFeedback(null);
-    }, 2000);
-  };
-
   // When we have a roomId, join it on the server and get a seat assigned
   useEffect(() => {
     if (!roomId) return;
@@ -355,8 +326,7 @@ const App: React.FC = () => {
 
     const handleJoined = (data: any) => {
       if (!data) return;
-      if (data.roomId !== roomId || !data || data.clientId !== clientId)
-        return;
+      if (data.roomId !== roomId || data.clientId !== clientId) return;
 
       console.log("🎯 Received room:joined", data);
       const seatIndex =
@@ -389,7 +359,7 @@ const App: React.FC = () => {
   // ---------- SOCKET BROADCAST HELPER ----------
   const broadcastState = (overrides: Partial<SyncedState> = {}) => {
     if (!roomId) {
-      // No room selected yet; don't emit
+      // Shouldn't happen now, but guard is harmless
       return;
     }
 
@@ -1221,10 +1191,8 @@ const App: React.FC = () => {
   const thisPlayer = players[thisPlayerIndex];
 
   // Is this browser currently the patcher or breaker?
-  const isPatcherHere =
-    !isSpectator && playerSeat === currentPatcherIndex;
-  const isBreakerHere =
-    !isSpectator && playerSeat === currentBreakerIndex;
+  const isPatcherHere = !isSpectator && playerSeat === currentPatcherIndex;
+  const isBreakerHere = !isSpectator && playerSeat === currentBreakerIndex;
 
   // Presence helpers
   const seat0 = roomPresence?.seats?.find((s) => s.seatIndex === 0);
@@ -1233,26 +1201,6 @@ const App: React.FC = () => {
   const seat1Connected = !!seat1?.connected;
   const spectatorsCount = roomPresence?.spectatorsCount ?? 0;
 
-  // Lobby status message
-  let lobbyMessage = "";
-  if (phase === "enterNames") {
-    if (!seat0 && !seat1) {
-      lobbyMessage = "Waiting for both players to join this room.";
-    } else if (seat0 && !seat1) {
-      lobbyMessage = "Waiting for Player 2 to join this room.";
-    } else if (!seat0 && seat1) {
-      lobbyMessage = "Waiting for Player 1 to join this room.";
-    } else if (!players[0].ready || !players[1].ready) {
-      lobbyMessage =
-        "Both players are connected. Each player should enter and confirm their name.";
-    } else {
-      lobbyMessage =
-        "Both players are ready. Either player can start the duel.";
-    }
-  } else {
-    lobbyMessage = "Game in progress.";
-  }
-
   // --- name confirm handler for this browser's seat ---
   const handleConfirmName = () => {
     if (isSpectator || playerSeat === null) return;
@@ -1260,10 +1208,7 @@ const App: React.FC = () => {
     const rawName = players[index].name.trim();
     if (!rawName) return;
 
-    const updatedPlayers: Player[] = [
-      { ...players[0] },
-      { ...players[1] },
-    ];
+    const updatedPlayers: Player[] = [{ ...players[0] }, { ...players[1] }];
     updatedPlayers[index] = {
       ...updatedPlayers[index],
       name: rawName,
@@ -1287,121 +1232,7 @@ const App: React.FC = () => {
     });
   };
 
-  // ---------- ROOM JOIN SCREEN (before any game UI) ----------
-  if (!roomId) {
-    return (
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          overflowY: "auto",
-          padding: "16px clamp(8px, 4vw, 32px)",
-          boxSizing: "border-box",
-          fontFamily:
-            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-          background: "#0f172a",
-          color: "#e5e7eb",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 520,
-            width: "100%",
-            background: "#020617",
-            padding: 24,
-            borderRadius: 18,
-            boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
-          }}
-        >
-          <h1
-            style={{
-              textAlign: "center",
-              marginBottom: 8,
-              fontSize: "clamp(28px, 4vw, 40px)",
-            }}
-          >
-            RuleShift
-          </h1>
-          <p
-            style={{
-              textAlign: "center",
-              fontSize: 13,
-              opacity: 0.78,
-              marginBottom: 18,
-            }}
-          >
-            Enter a room code to{" "}
-            <span style={{ fontWeight: 600 }}>create</span> a new duel or{" "}
-            <span style={{ fontWeight: 600 }}>join</span> an existing one.
-          </p>
-
-          <label style={{ display: "block", marginBottom: 12, fontSize: 13 }}>
-            Room code
-            <input
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                marginTop: 4,
-                padding: 10,
-                borderRadius: 999,
-                border: "1px solid #374151",
-                background: "#020617",
-                color: "#e5e7eb",
-                fontSize: 14,
-                textTransform: "uppercase",
-              }}
-              value={roomInput}
-              onChange={(e) => setRoomInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleJoinRoom();
-                }
-              }}
-              placeholder="e.g. ABCD or FRIENDS"
-            />
-          </label>
-
-          <button
-            onClick={handleJoinRoom}
-            disabled={!roomInput.trim()}
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              padding: "10px 16px",
-              borderRadius: 999,
-              border: "none",
-              fontWeight: 600,
-              cursor: roomInput.trim() ? "pointer" : "not-allowed",
-              background: roomInput.trim() ? "#2563eb" : "#1f2937",
-              color: "#e5e7eb",
-              fontSize: 14,
-              marginBottom: 8,
-            }}
-          >
-            Join room
-          </button>
-
-          <p
-            style={{
-              fontSize: 11,
-              opacity: 0.7,
-              textAlign: "center",
-              marginTop: 8,
-            }}
-          >
-            Share the same room code with your opponent so you both connect to
-            the same duel.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // From here, we have a roomId. Seat is assigned by the server
+  // From here, we always have a roomId. Seat is assigned by the server.
   return (
     <div
       style={{
@@ -1432,87 +1263,44 @@ const App: React.FC = () => {
           RuleShift
         </h1>
 
-        {/* Room + role + copy link */}
-        <div
+        <p
           style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: 8,
-            flexWrap: "wrap",
+            textAlign: "center",
             marginBottom: 4,
             fontSize: 12,
+            opacity: 0.75,
           }}
         >
-          <span>
-            Room: <strong>{roomId}</strong>{" "}
-            <span style={{ opacity: 0.7 }}>
-              •{" "}
-              {isSpectator
-                ? "You are watching as a spectator"
-                : `You are Player ${thisPlayerIndex + 1}`}
-            </span>
+          Room: <strong>{roomId}</strong>{" "}
+          <span style={{ opacity: 0.7 }}>
+            •{" "}
+            {isSpectator
+              ? "You are watching as a spectator"
+              : `You are Player ${thisPlayerIndex + 1}`}
           </span>
-          <button
-            onClick={handleCopyRoomLink}
-            style={{
-              padding: "4px 10px",
-              borderRadius: 999,
-              border: "1px solid #4b5563",
-              background: "#020617",
-              color: "#e5e7eb",
-              fontSize: 11,
-              cursor: "pointer",
-            }}
-          >
-            Copy room link
-          </button>
-        </div>
+        </p>
 
-        {copyFeedback && (
+        {/* You can plug your "Copy room link" button here if you haven't already */}
+
+        {roomPresence && (
           <p
             style={{
               textAlign: "center",
-              marginBottom: 6,
+              marginBottom: 16,
               fontSize: 11,
-              opacity: 0.85,
+              opacity: 0.8,
             }}
           >
-            {copyFeedback}
+            Connections — P1:{" "}
+            <span style={{ color: seat0Connected ? "#4ade80" : "#f97373" }}>
+              {seat0Connected ? "online" : "offline"}
+            </span>{" "}
+            · P2:{" "}
+            <span style={{ color: seat1Connected ? "#4ade80" : "#f97373" }}>
+              {seat1Connected ? "online" : "offline"}
+            </span>{" "}
+            · Spectators: {spectatorsCount}
           </p>
-        )}
-
-        {roomPresence && (
-          <>
-            <p
-              style={{
-                textAlign: "center",
-                marginBottom: 4,
-                fontSize: 11,
-                opacity: 0.8,
-              }}
-            >
-              Connections — P1:{" "}
-              <span style={{ color: seat0Connected ? "#4ade80" : "#f97373" }}>
-                {seat0Connected ? "online" : "offline"}
-              </span>{" "}
-              · P2:{" "}
-              <span style={{ color: seat1Connected ? "#4ade80" : "#f97373" }}>
-                {seat1Connected ? "online" : "offline"}
-              </span>{" "}
-              · Spectators: {spectatorsCount}
-            </p>
-            <p
-              style={{
-                textAlign: "center",
-                marginBottom: 16,
-                fontSize: 11,
-                opacity: 0.75,
-              }}
-            >
-              {lobbyMessage}
-            </p>
-          </>
         )}
 
         {!roomPresence && (
@@ -1886,7 +1674,7 @@ const App: React.FC = () => {
                 </h3>
                 <p style={{ fontSize: 14 }}>
                   Waiting for{" "}
-                  <strong>{currentPatcherName || "your opponent"}</strong> to
+                    <strong>{currentPatcherName || "your opponent"}</strong> to
                   set the secret code and add a new rule.
                 </p>
               </div>
