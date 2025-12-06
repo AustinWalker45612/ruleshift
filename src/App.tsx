@@ -1226,18 +1226,6 @@ const App: React.FC = () => {
         >
           RuleShift
         </h1>
-        <p
-          style={{
-            textAlign: "center",
-            fontSize: "clamp(12px, 1.4vw, 14px)",
-            opacity: 0.7,
-          }}
-        >
-          phase: {phase} • you are{" "}
-          {thisPlayer.name
-            ? `Player ${thisPlayerIndex + 1} (${thisPlayer.name})`
-            : `Player ${thisPlayerIndex + 1}`}
-        </p>
 
         <p
           style={{
@@ -1603,7 +1591,7 @@ const App: React.FC = () => {
             >
               <h3 style={{ marginBottom: 8, fontSize: 13 }}>Duel History</h3>
 
-              {rounds.length === 0 ? (
+              {rounds.length === 0 || rounds.length == 1 ? (
                 <p style={{ opacity: 0.6, fontSize: 12 }}>
                   Once you get further into the duel, completed rounds will appear here.
                 </p>
