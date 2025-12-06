@@ -61,7 +61,7 @@ type PlayerSeat = 0 | 1 | null;
  * (Per-device-only things like playerSeat, breakerError, etc. stay local.)
  */
 type SyncedState = {
-  // Step 1 room wiring: for now this is just informational / future use.
+  // Room identifier (Step 1+2+3)
   roomId?: string;
 
   players: Player[];
@@ -87,15 +87,16 @@ type SyncedState = {
   lastBreakerPoints: number | null;
   lastPatcherPoints: number | null;
 
-  // NEW: which templates were available when the last patch was made
+  // which templates were available when the last patch was made
   templatesAvailableForCurrentRound: TemplateOptionSummary[];
 
   sender?: string;
 };
 
 const App: React.FC = () => {
-  // Step 1: hardcoded room ID – this will later come from a Join/Create UI or URL
-  const [roomId] = useState<string>("debug-room");
+  // Step 3: room selection
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [roomInput, setRoomInput] = useState<string>("");
 
   // Which seat this browser is controlling: Player 1 (0) or Player 2 (1)
   const [playerSeat, setPlayerSeat] = useState<PlayerSeat>(null);
@@ -181,7 +182,7 @@ const App: React.FC = () => {
     null
   );
 
-  // NEW: templates that were available when the current patch was made
+  // templates that were available when the current patch was made
   const [templatesAvailableForCurrentRound, setTemplatesAvailableForCurrentRound] =
     useState<TemplateOptionSummary[]>([]);
 
@@ -241,10 +242,26 @@ const App: React.FC = () => {
     };
   }, [isEndgameWindow, prevValidCodesCount, currentValidCount]);
 
+  // ---------- ROOM JOIN HANDLER (Step 3) ----------
+  const handleJoinRoom = () => {
+    const trimmed = roomInput.trim();
+    if (!trimmed) return;
+
+    // You can normalize room codes here if you like:
+    // e.g., uppercase to make them easier to share.
+    const normalized = trimmed.toUpperCase();
+    setRoomId(normalized);
+  };
+
   // ---------- SOCKET BROADCAST HELPER ----------
   const broadcastState = (overrides: Partial<SyncedState> = {}) => {
+    if (!roomId) {
+      // No room selected yet; don't emit
+      return;
+    }
+
     const payload: SyncedState = {
-      roomId, // Step 1: include roomId in the synced state payload
+      roomId,
       players,
       phase,
       currentPatcherIndex,
@@ -277,7 +294,11 @@ const App: React.FC = () => {
       // Ignore our own echo
       if (remote.sender && remote.sender === socket.id) return;
 
-      // (Later we can check remote.roomId against our roomId; for Step 1 we just ignore it)
+      // Optionally ignore states for other rooms, if server ever cross-sends
+      if (roomId && remote.roomId && remote.roomId !== roomId) {
+        return;
+      }
+
       setPlayers(remote.players);
       setPhase(remote.phase);
       setCurrentPatcherIndex(remote.currentPatcherIndex);
@@ -310,16 +331,17 @@ const App: React.FC = () => {
     return () => {
       socket.off("game:state", handler);
     };
-  }, []);
+  }, [roomId]);
 
   // ---------- ON CONNECT / RECONNECT: REQUEST LATEST STATE ----------
   useEffect(() => {
+    if (!roomId) return;
+
     const requestState = () => {
       console.log(
         "🔄 Requesting latest game state from server for room:",
         roomId
       );
-      // Step 1: include roomId in the request payload (server can ignore for now)
       socket.emit("game:requestState", { roomId });
     };
 
@@ -861,7 +883,7 @@ const App: React.FC = () => {
             `❌ Invalid: this guess breaks at least one active rule. Endgame attempts left: ${newAttempts}.`
           );
 
-          // NEW: broadcast the updated attempts so spectator sees countdown
+          // broadcast updated attempts so spectator sees countdown
           broadcastState({
             endgameAttemptsLeft: newAttempts,
           });
@@ -1101,6 +1123,120 @@ const App: React.FC = () => {
     });
   };
 
+  // ---------- ROOM JOIN SCREEN (before seat selection) ----------
+  if (!roomId) {
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          overflowY: "auto",
+          padding: "16px clamp(8px, 4vw, 32px)",
+          boxSizing: "border-box",
+          fontFamily:
+            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+          background: "#0f172a",
+          color: "#e5e7eb",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 520,
+            width: "100%",
+            background: "#020617",
+            padding: 24,
+            borderRadius: 18,
+            boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
+          }}
+        >
+          <h1
+            style={{
+              textAlign: "center",
+              marginBottom: 8,
+              fontSize: "clamp(28px, 4vw, 40px)",
+            }}
+          >
+            RuleShift
+          </h1>
+          <p
+            style={{
+              textAlign: "center",
+              fontSize: 13,
+              opacity: 0.78,
+              marginBottom: 18,
+            }}
+          >
+            Enter a room code to{" "}
+            <span style={{ fontWeight: 600 }}>create</span> a new duel or{" "}
+            <span style={{ fontWeight: 600 }}>join</span> an existing one.
+          </p>
+
+          <label style={{ display: "block", marginBottom: 12, fontSize: 13 }}>
+            Room code
+            <input
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                marginTop: 4,
+                padding: 10,
+                borderRadius: 999,
+                border: "1px solid #374151",
+                background: "#020617",
+                color: "#e5e7eb",
+                fontSize: 14,
+                textTransform: "uppercase",
+              }}
+              value={roomInput}
+              onChange={(e) => setRoomInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleJoinRoom();
+                }
+              }}
+              placeholder="e.g. ABCD or FRIENDS"
+            />
+          </label>
+
+          <button
+            onClick={handleJoinRoom}
+            disabled={!roomInput.trim()}
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "10px 16px",
+              borderRadius: 999,
+              border: "none",
+              fontWeight: 600,
+              cursor: roomInput.trim() ? "pointer" : "not-allowed",
+              background: roomInput.trim() ? "#2563eb" : "#1f2937",
+              color: "#e5e7eb",
+              fontSize: 14,
+              marginBottom: 8,
+            }}
+          >
+            Join room
+          </button>
+
+          <p
+            style={{
+              fontSize: 11,
+              opacity: 0.7,
+              textAlign: "center",
+              marginTop: 8,
+            }}
+          >
+            Share the same room code with your opponent so you both connect to
+            the same duel.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // ---------- SEAT SELECTION SCREEN ----------
   if (playerSeat === null) {
     return (
@@ -1133,7 +1269,7 @@ const App: React.FC = () => {
           <h1
             style={{
               textAlign: "center",
-              marginBottom: 12,
+              marginBottom: 6,
               fontSize: "clamp(28px, 4vw, 40px)",
             }}
           >
@@ -1142,12 +1278,22 @@ const App: React.FC = () => {
           <p
             style={{
               textAlign: "center",
+              fontSize: 12,
+              opacity: 0.72,
+              marginBottom: 4,
+            }}
+          >
+            Room: <strong>{roomId}</strong>
+          </p>
+          <p
+            style={{
+              textAlign: "center",
               fontSize: "clamp(13px, 1.4vw, 15px)",
               opacity: 0.8,
               marginBottom: 24,
             }}
           >
-            On this computer, which player are you?
+            On this device, which player are you?
           </p>
 
           <button
@@ -1197,8 +1343,8 @@ const App: React.FC = () => {
               textAlign: "center",
             }}
           >
-            Have Player 1 and Player 2 each open this page on their own
-            computer, then pick their seat.
+            Have Player 1 and Player 2 each open this page on their own device,
+            join the same room, then pick their seat.
           </p>
         </div>
       </div>
@@ -1232,12 +1378,23 @@ const App: React.FC = () => {
         <h1
           style={{
             textAlign: "center",
-            marginBottom: 8,
+            marginBottom: 4,
             fontSize: "clamp(30px, 4.2vw, 44px)",
           }}
         >
           RuleShift
         </h1>
+
+        <p
+          style={{
+            textAlign: "center",
+            marginBottom: 4,
+            fontSize: 12,
+            opacity: 0.75,
+          }}
+        >
+          Room: <strong>{roomId}</strong>
+        </p>
 
         <p
           style={{

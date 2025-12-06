@@ -15,44 +15,70 @@ const io = new Server(server, {
   },
 });
 
-// In-memory store of the last known full game state
-let latestState = null;
+// In-memory store of per-room game state
+// roomId (string) -> latest SyncedState for that room (without sender)
+const roomStates = new Map();
 
 io.on("connection", (socket) => {
   console.log("✅ Client connected:", socket.id);
 
   // Client pushes a new game state snapshot
   socket.on("game:state", (payload) => {
-    console.log("📩 Received game:state from", socket.id);
+    // payload is the SyncedState coming from the client, including roomId and sender
+    const roomId = payload && payload.roomId ? String(payload.roomId) : "default";
+    console.log("📩 Received game:state from", socket.id, "for room:", roomId);
 
-    // Store a clean copy as the "authoritative" latest state
-    // We don't care who sent it when we replay it later
-    latestState = { ...payload };
-    delete latestState.sender;
+    // Make sure this socket is in the room
+    socket.join(roomId);
 
-    // Broadcast to all OTHER clients
-    socket.broadcast.emit("game:state", {
+    // Store a clean copy as the "authoritative" latest state for this room
+    const latestStateForRoom = { ...payload };
+    delete latestStateForRoom.sender; // we don't persist sender
+    roomStates.set(roomId, latestStateForRoom);
+
+    // Broadcast to all OTHER clients in this room only
+    socket.to(roomId).emit("game:state", {
       ...payload,
       sender: socket.id,
     });
   });
 
   // New/reconnected client asks for current state
-  socket.on("game:requestState", () => {
-    console.log("🔁", socket.id, "requested latest game state");
-    if (latestState) {
+  socket.on("game:requestState", (payload) => {
+    const roomId =
+      payload && payload.roomId ? String(payload.roomId) : "default";
+
+    console.log(
+      "🔁",
+      socket.id,
+      "requested latest game state for room:",
+      roomId
+    );
+
+    // Make sure this socket is in the requested room
+    socket.join(roomId);
+
+    const latestStateForRoom = roomStates.get(roomId);
+    if (latestStateForRoom) {
       // Send only to this socket
       socket.emit("game:state", {
-        ...latestState,
+        ...latestStateForRoom,
         sender: undefined,
       });
     } else {
-      console.log("⚠️ No latestState stored yet — probably pre-game");
+      console.log(
+        "⚠️ No state stored yet for room",
+        roomId,
+        "— probably pre-game"
+      );
+      // It's fine to do nothing here; client will stay in initial UI state
     }
   });
 
   socket.on("disconnect", () => {
     console.log("❌ Client disconnected:", socket.id);
+    // For now we don't clear roomStates on disconnect.
+    // State stays alive so reconnects / new clients can see the last game.
   });
 });
 
