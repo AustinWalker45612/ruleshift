@@ -4,6 +4,9 @@ const { Server } = require("socket.io");
 
 const PORT = process.env.PORT || 4000;
 
+// How long we keep a seat reserved after disconnect (in ms)
+const DISCONNECT_GRACE_MS = 90_000; // 90 seconds
+
 // Create bare HTTP server (no Express needed)
 const server = http.createServer();
 
@@ -20,8 +23,14 @@ const io = new Server(server, {
  * rooms = Map<roomId, {
  *   latestState: object | null,
  *   seats: {
- *     0: { clientId: string, socketId: string, connected: boolean } | null,
- *     1: { clientId: string, socketId: string, connected: boolean } | null,
+ *     0: {
+ *       clientId: string,
+ *       socketId: string | null,
+ *       connected: boolean,
+ *       disconnectedAt?: number,
+ *       disconnectTimer?: NodeJS.Timeout
+ *     } | null,
+ *     1: same,
  *   },
  *   spectators: Map<clientId, Set<socketId>>,
  * }>
@@ -79,6 +88,52 @@ function emitRoomPresence(roomId) {
   });
 }
 
+/**
+ * Start or restart a disconnect timeout for a given seat.
+ * After DISCONNECT_GRACE_MS, if the seat is still disconnected for the same client,
+ * we free the seat.
+ */
+function startSeatDisconnectTimer(roomId, seatIndex, clientId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  const seat = room.seats[seatIndex];
+  if (!seat || seat.clientId !== clientId) return;
+
+  // Clear any existing timer first
+  if (seat.disconnectTimer) {
+    clearTimeout(seat.disconnectTimer);
+    seat.disconnectTimer = undefined;
+  }
+
+  seat.disconnectedAt = Date.now();
+
+  const timer = setTimeout(() => {
+    const currentRoom = rooms.get(roomId);
+    if (!currentRoom) return;
+    const currentSeat = currentRoom.seats[seatIndex];
+
+    // If seat was freed or taken by someone else, do nothing
+    if (!currentSeat || currentSeat.clientId !== clientId) return;
+
+    // If they reconnected, connected will be true
+    if (currentSeat.connected) return;
+
+    // Final safety check on time elapsed
+    const elapsed = Date.now() - (currentSeat.disconnectedAt || 0);
+    if (elapsed < DISCONNECT_GRACE_MS) return;
+
+    console.log(
+      `⏱️  Seat timeout: freeing seat ${seatIndex} in room ${roomId} (clientId=${clientId})`
+    );
+
+    // Free the seat
+    currentRoom.seats[seatIndex] = null;
+    emitRoomPresence(roomId);
+  }, DISCONNECT_GRACE_MS);
+
+  seat.disconnectTimer = timer;
+}
+
 io.on("connection", (socket) => {
   console.log("✅ Client connected:", socket.id);
 
@@ -104,6 +159,13 @@ io.on("connection", (socket) => {
         seatIndex = idx;
         seat.socketId = socket.id;
         seat.connected = true;
+        seat.disconnectedAt = undefined;
+
+        // Clear any pending disconnect timer
+        if (seat.disconnectTimer) {
+          clearTimeout(seat.disconnectTimer);
+          seat.disconnectTimer = undefined;
+        }
         break;
       }
     }
@@ -116,6 +178,8 @@ io.on("connection", (socket) => {
           clientId,
           socketId: socket.id,
           connected: true,
+          disconnectedAt: undefined,
+          disconnectTimer: undefined,
         };
       } else if (!room.seats[1]) {
         seatIndex = 1;
@@ -123,6 +187,8 @@ io.on("connection", (socket) => {
           clientId,
           socketId: socket.id,
           connected: true,
+          disconnectedAt: undefined,
+          disconnectTimer: undefined,
         };
       } else {
         // No seats free -> spectator
@@ -175,7 +241,12 @@ io.on("connection", (socket) => {
     const normalizedRoomId = String(roomId).toUpperCase();
     const room = getOrCreateRoom(normalizedRoomId);
 
-    console.log("📩 Received game:state from", socket.id, "for room", normalizedRoomId);
+    console.log(
+      "📩 Received game:state from",
+      socket.id,
+      "for room",
+      normalizedRoomId
+    );
 
     // Store a clean copy as the "authoritative" latest state for this room
     const latestState = { ...payload };
@@ -237,8 +308,13 @@ io.on("connection", (socket) => {
     if (seatIndex === 0 || seatIndex === 1) {
       const seat = room.seats[seatIndex];
       if (seat && seat.socketId === socket.id) {
-        // Mark seat as disconnected but keep ownership (we'll decide about timeout/cleanup later)
+        // Mark seat as disconnected but keep ownership for a grace period
         seat.connected = false;
+        seat.socketId = null;
+        console.log(
+          `🔌 Seat ${seatIndex} in room ${roomId} disconnected for clientId=${clientId}, starting grace timer`
+        );
+        startSeatDisconnectTimer(roomId, seatIndex, clientId);
       }
     } else {
       // Spectator: remove this socket from the spectator map
