@@ -61,6 +61,9 @@ type PlayerSeat = 0 | 1 | null;
  * (Per-device-only things like playerSeat, breakerError, etc. stay local.)
  */
 type SyncedState = {
+  // Step 1 room wiring: for now this is just informational / future use.
+  roomId?: string;
+
   players: Player[];
   phase: Phase;
   currentPatcherIndex: number;
@@ -91,6 +94,9 @@ type SyncedState = {
 };
 
 const App: React.FC = () => {
+  // Step 1: hardcoded room ID – this will later come from a Join/Create UI or URL
+  const [roomId] = useState<string>("debug-room");
+
   // Which seat this browser is controlling: Player 1 (0) or Player 2 (1)
   const [playerSeat, setPlayerSeat] = useState<PlayerSeat>(null);
 
@@ -238,6 +244,7 @@ const App: React.FC = () => {
   // ---------- SOCKET BROADCAST HELPER ----------
   const broadcastState = (overrides: Partial<SyncedState> = {}) => {
     const payload: SyncedState = {
+      roomId, // Step 1: include roomId in the synced state payload
       players,
       phase,
       currentPatcherIndex,
@@ -270,6 +277,7 @@ const App: React.FC = () => {
       // Ignore our own echo
       if (remote.sender && remote.sender === socket.id) return;
 
+      // (Later we can check remote.roomId against our roomId; for Step 1 we just ignore it)
       setPlayers(remote.players);
       setPhase(remote.phase);
       setCurrentPatcherIndex(remote.currentPatcherIndex);
@@ -307,8 +315,12 @@ const App: React.FC = () => {
   // ---------- ON CONNECT / RECONNECT: REQUEST LATEST STATE ----------
   useEffect(() => {
     const requestState = () => {
-      console.log("🔄 Requesting latest game state from server...");
-      socket.emit("game:requestState");
+      console.log(
+        "🔄 Requesting latest game state from server for room:",
+        roomId
+      );
+      // Step 1: include roomId in the request payload (server can ignore for now)
+      socket.emit("game:requestState", { roomId });
     };
 
     if (socket.connected) {
@@ -320,7 +332,7 @@ const App: React.FC = () => {
     return () => {
       socket.off("connect", requestState);
     };
-  }, []);
+  }, [roomId]);
 
   // ---------- LOCAL EFFECTS (NOT EMITTING) ----------
   useEffect(() => {
@@ -1593,7 +1605,8 @@ const App: React.FC = () => {
 
               {rounds.length === 0 || rounds.length == 1 ? (
                 <p style={{ opacity: 0.6, fontSize: 12 }}>
-                  Once you get further into the duel, completed rounds will appear here.
+                  Once you get further into the duel, completed rounds will
+                  appear here.
                 </p>
               ) : (
                 rounds.map((r) => (
