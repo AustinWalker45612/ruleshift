@@ -17,6 +17,7 @@ import ResultScreens from "./components/ResultScreens";
 
 import { PatcherView } from "./components/PatcherView";
 import { BreakerView } from "./components/BreakerView";
+import { HowToPlayModal } from "./components/HowToPlayModal";
 
 type Player = {
   name: string;
@@ -279,6 +280,9 @@ const App: React.FC = () => {
   const [templatesAvailableForCurrentRound, setTemplatesAvailableForCurrentRound] =
     useState<TemplateOptionSummary[]>([]);
 
+  // How to Play modal visibility
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
+
   const currentPatcher = players[currentPatcherIndex];
   const currentBreakerIndex = 1 - currentPatcherIndex;
   const currentBreaker = players[currentBreakerIndex];
@@ -500,6 +504,21 @@ const App: React.FC = () => {
       }
     }
   }, [phase, isEndgameWindow, endgameStats]);
+
+  // Show How to Play automatically once per device
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const key = "ruleshiftHasSeenHowToPlay";
+      const hasSeen = window.localStorage.getItem(key);
+      if (!hasSeen) {
+        setShowHowToPlay(true);
+        window.localStorage.setItem(key, "true");
+      }
+    } catch {
+      // ignore localStorage issues
+    }
+  }, []);
 
   // Visible rules in the UI:
   // During breakerTurn we hide ONLY the newest rule.
@@ -1280,108 +1299,141 @@ const App: React.FC = () => {
           margin: "0 auto",
         }}
       >
-        <h1
-          style={{
-            textAlign: "center",
-            marginBottom: 4,
-            fontSize: "clamp(30px, 4.2vw, 44px)",
-          }}
-        >
-          RuleShift
-        </h1>
-
-        <p
-          style={{
-            textAlign: "center",
-            marginBottom: 4,
-            fontSize: 12,
-            opacity: 0.75,
-          }}
-        >
-          Room: <strong>{roomId}</strong>{" "}
-          <span style={{ opacity: 0.7 }}>
-            •{" "}
-            {isSpectator
-              ? "You are watching as a spectator"
-              : `You are Player ${thisPlayerIndex + 1}`}
-          </span>
-        </p>
-
-        <div
+        {/* HEADER WITH TITLE + ROOM + HOW-TO BUTTON */}
+        <header
           style={{
             display: "flex",
-            justifyContent: "center",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 12,
             marginBottom: 12,
+            flexWrap: "wrap",
           }}
         >
-          <button
-            onClick={handleCopyRoomLink}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 12px",
-              borderRadius: 999,
-              border: "1px solid #4b5563",
-              background: "#020617",
-              color: "#e5e7eb",
-              fontSize: 11,
-              cursor: "pointer",
-            }}
-          >
-            <span>Copy room link</span>
-            {copyStatus === "copied" && (
-              <span style={{ fontSize: 11, color: "#4ade80" }}>✓ Copied</span>
+          <div style={{ flex: "1 1 260px" }}>
+            <h1
+              style={{
+                marginBottom: 4,
+                fontSize: "clamp(30px, 4.2vw, 44px)",
+              }}
+            >
+              RuleShift
+            </h1>
+
+            <p
+              style={{
+                marginBottom: 4,
+                fontSize: 12,
+                opacity: 0.75,
+              }}
+            >
+              Room: <strong>{roomId}</strong>{" "}
+              <span style={{ opacity: 0.7 }}>
+                •{" "}
+                {isSpectator
+                  ? "You are watching as a spectator"
+                  : `You are Player ${thisPlayerIndex + 1}`}
+              </span>
+            </p>
+
+            {roomPresence && (
+              <p
+                style={{
+                  marginBottom: 4,
+                  fontSize: 11,
+                  opacity: 0.8,
+                }}
+              >
+                Connections — P1:{" "}
+                <span
+                  style={{ color: seat0Connected ? "#4ade80" : "#f97373" }}
+                >
+                  {seat0Connected ? "online" : "offline"}
+                </span>{" "}
+                · P2:{" "}
+                <span
+                  style={{ color: seat1Connected ? "#4ade80" : "#f97373" }}
+                >
+                  {seat1Connected ? "online" : "offline"}
+                </span>{" "}
+                · Spectators: {spectatorsCount}
+              </p>
             )}
-            {copyStatus === "error" && (
-              <span style={{ fontSize: 11, color: "#f97373" }}>Error</span>
+
+            {!roomPresence && (
+              <p
+                style={{
+                  marginBottom: 4,
+                  fontSize: 11,
+                  opacity: 0.6,
+                }}
+              >
+                Connecting players…
+              </p>
             )}
-          </button>
-        </div>
 
-        {roomPresence && (
-          <p
+            <p
+              style={{
+                marginTop: 4,
+                marginBottom: 0,
+                fontSize: "clamp(13px, 1.5vw, 15px)",
+              }}
+            >
+              Two players. One evolving rule system. Patcher vs Breaker in a
+              duel.
+            </p>
+          </div>
+
+          <div
             style={{
-              textAlign: "center",
-              marginBottom: 16,
-              fontSize: 11,
-              opacity: 0.8,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              alignItems: "flex-end",
+              flexShrink: 0,
             }}
           >
-            Connections — P1:{" "}
-            <span style={{ color: seat0Connected ? "#4ade80" : "#f97373" }}>
-              {seat0Connected ? "online" : "offline"}
-            </span>{" "}
-            · P2:{" "}
-            <span style={{ color: seat1Connected ? "#4ade80" : "#f97373" }}>
-              {seat1Connected ? "online" : "offline"}
-            </span>{" "}
-            · Spectators: {spectatorsCount}
-          </p>
-        )}
+            <button
+              onClick={handleCopyRoomLink}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: "1px solid #4b5563",
+                background: "#020617",
+                color: "#e5e7eb",
+                fontSize: 11,
+                cursor: "pointer",
+              }}
+            >
+              <span>Copy room link</span>
+              {copyStatus === "copied" && (
+                <span style={{ fontSize: 11, color: "#4ade80" }}>✓ Copied</span>
+              )}
+              {copyStatus === "error" && (
+                <span style={{ fontSize: 11, color: "#f97373" }}>Error</span>
+              )}
+            </button>
 
-        {!roomPresence && (
-          <p
-            style={{
-              textAlign: "center",
-              marginBottom: 16,
-              fontSize: 11,
-              opacity: 0.6,
-            }}
-          >
-            Connecting players…
-          </p>
-        )}
-
-        <p
-          style={{
-            textAlign: "center",
-            marginBottom: 20,
-            fontSize: "clamp(13px, 1.5vw, 15px)",
-          }}
-        >
-          Two players. One evolving rule system. Patcher vs Breaker in a duel.
-        </p>
+            <button
+              onClick={() => setShowHowToPlay(true)}
+              style={{
+                borderRadius: 999,
+                padding: "6px 12px",
+                border: "1px solid #4b5563",
+                background: "#020617",
+                color: "#e5e7eb",
+                cursor: "pointer",
+                fontSize: 13,
+                whiteSpace: "nowrap",
+              }}
+            >
+              ❓ How to play
+            </button>
+          </div>
+        </header>
 
         {/* === ENTER NAMES === */}
         {phase === "enterNames" && (
@@ -1901,6 +1953,14 @@ const App: React.FC = () => {
             </div>
           </>
         )}
+
+        {/* HOW TO PLAY MODAL – AVAILABLE ON ALL PHASES */}
+        <HowToPlayModal
+          isOpen={showHowToPlay}
+          onClose={() => setShowHowToPlay(false)}
+          currentPatcherName={currentPatcherName}
+          currentBreakerName={currentBreakerName}
+        />
       </div>
     </div>
   );
