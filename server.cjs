@@ -166,11 +166,13 @@ async function upsertPlayer({ clientId, name }) {
     where: { id: clientId },
     update: {
       name,
+      updatedAt: now,
       // updatedAt is handled automatically by @updatedAt in the schema
     },
     create: {
       id: clientId,
       name,
+      updatedAt: now,
       // totalXp, duelsPlayed, duelsWon all use defaults in schema
     },
   });
