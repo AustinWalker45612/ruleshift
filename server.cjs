@@ -169,7 +169,6 @@ async function upsertPlayer({ clientId, name }) {
     },
     create: {
       id: clientId,
-      clientId,
       name,
       createdAt: now,
       updatedAt: now,
