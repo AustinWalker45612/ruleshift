@@ -27,6 +27,8 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
         justifyContent: "center",
         zIndex: 1000,
         padding: 16,
+        // allow the whole overlay to scroll if content is taller than viewport
+        overflowY: "auto",
       }}
       role="dialog"
       aria-modal="true"
@@ -44,6 +46,9 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           padding: 20,
           color: "#e5e7eb",
           fontSize: 14,
+          // key bits: limit height to viewport and make inside scroll
+          maxHeight: "80vh",
+          overflowY: "auto",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -105,12 +110,12 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
             The Patcher keeps adding rules that shrink the space of possible
             codes. The Breaker tries to find the exact secret code{" "}
             <strong>before they run out of safe guesses</strong>, especially
-            once the game enters{" "}
-            <strong>Endgame</strong> (very few valid codes remain).
+            once the game enters <strong>Endgame</strong> (very few valid codes
+            remain).
           </p>
         </section>
 
-        {/* Feedback meanings */}
+        {/* Guess feedback */}
         <section style={{ marginBottom: 12 }}>
           <h3 style={{ fontSize: 16, marginBottom: 6 }}>Guess feedback</h3>
           <ul style={{ paddingLeft: 18, margin: 0 }}>
@@ -164,7 +169,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           </ol>
         </section>
 
-        {/* How to win / scoring – kept lightweight for MVP */}
+        {/* How to win */}
         <section style={{ marginBottom: 12 }}>
           <h3 style={{ fontSize: 16, marginBottom: 6 }}>How to win the duel</h3>
           <ul style={{ paddingLeft: 18, margin: 0 }}>
@@ -177,13 +182,13 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
               INVALID guesses or fails to find the code in Endgame.
             </li>
             <li>
-              After you play however many rounds you want, compare scores –
+              After you play however many rounds you want, compare scores –{" "}
               <strong>highest total score wins</strong> the duel.
             </li>
           </ul>
         </section>
 
-        {/* Simple visual flow */}
+        {/* Visual flow */}
         <section style={{ marginBottom: 12 }}>
           <h3 style={{ fontSize: 16, marginBottom: 6 }}>Round flow (visual)</h3>
           <div
