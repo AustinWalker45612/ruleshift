@@ -155,31 +155,32 @@ function cleanupExpiredRooms() {
 setInterval(cleanupExpiredRooms, ROOM_SWEEP_INTERVAL_MS);
 
 // Small helper so we don’t duplicate logic
+// Small helper so we don’t duplicate logic
 async function upsertPlayer({ clientId, name }) {
-  if (!clientId || !name) {
-    console.warn("upsertPlayer missing data", { clientId, name });
-    return null;
-  }
+  if (!clientId || !name) return null;
 
-  const now = new Date(); // 👈 this was missing
-  // `id` is the primary key; we use clientId as that stable id
-  const player = await prisma.player.upsert({
+  const now = new Date();
+
+  return prisma.player.upsert({
     where: { id: clientId },
     update: {
       name,
       updatedAt: now,
-      // updatedAt is handled automatically by @updatedAt in the schema
     },
     create: {
       id: clientId,
+      clientId,
       name,
+      createdAt: now,
       updatedAt: now,
-      // totalXp, duelsPlayed, duelsWon all use defaults in schema
+      duelsPlayed: 0,
+      duelsWon: 0,
+      totalXp: 0,
     },
   });
-
-  return player;
 }
+
+
 
 
 io.on("connection", (socket) => {
