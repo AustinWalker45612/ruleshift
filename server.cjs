@@ -161,6 +161,7 @@ async function upsertPlayer({ clientId, name }) {
     return null;
   }
 
+  const now = new Date(); // 👈 this was missing
   // `id` is the primary key; we use clientId as that stable id
   const player = await prisma.player.upsert({
     where: { id: clientId },
