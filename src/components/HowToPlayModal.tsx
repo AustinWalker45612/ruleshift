@@ -27,7 +27,6 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
         justifyContent: "center",
         zIndex: 1000,
         padding: 16,
-        // allow the whole overlay to scroll if content is taller than viewport
         overflowY: "auto",
       }}
       role="dialog"
@@ -46,7 +45,6 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           padding: 20,
           color: "#e5e7eb",
           fontSize: 14,
-          // key bits: limit height to viewport and make inside scroll
           maxHeight: "80vh",
           overflowY: "auto",
         }}
@@ -109,9 +107,9 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           <p style={{ margin: 0 }}>
             The Patcher keeps adding rules that shrink the space of possible
             codes. The Breaker tries to find the exact secret code{" "}
-            <strong>before they run out of safe guesses</strong>, especially
-            once the game enters <strong>Endgame</strong> (very few valid codes
-            remain).
+            <strong>before they run out of attempts</strong>, especially once
+            the game enters <strong>Endgame</strong> (when only a small number
+            of codes are still valid).
           </p>
         </section>
 
@@ -132,6 +130,37 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
               <strong>INVALID</strong> – Your guess breaks{" "}
               <strong>at least one rule</strong>. In Endgame, invalid guesses
               also burn your remaining attempts.
+            </li>
+          </ul>
+        </section>
+
+        {/* Endgame */}
+        <section style={{ marginBottom: 12 }}>
+          <h3 style={{ fontSize: 16, marginBottom: 6 }}>Endgame</h3>
+          <p style={{ marginBottom: 6 }}>
+            Endgame begins automatically once the rule system has been tightened
+            so much that only <strong>25 or fewer valid codes remain</strong>.
+          </p>
+          <ul style={{ paddingLeft: 18, margin: 0 }}>
+            <li style={{ marginBottom: 4 }}>
+              The Breaker is given a{" "}
+              <strong>limited number of final attempts</strong>.
+            </li>
+            <li style={{ marginBottom: 4 }}>
+              Each <strong>INVALID</strong> guess uses up one of those
+              attempts.
+            </li>
+            <li style={{ marginBottom: 4 }}>
+              <strong>VALID</strong> guesses do not spend attempts, but must
+              still follow every rule.
+            </li>
+            <li style={{ marginBottom: 4 }}>
+              If the Breaker finds the <strong>exact</strong> code before
+              running out of attempts, they <strong>win Endgame</strong>.
+            </li>
+            <li>
+              If they run out of attempts without finding the code, the{" "}
+              <strong>Patcher wins Endgame</strong>.
             </li>
           </ul>
         </section>
@@ -174,12 +203,16 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           <h3 style={{ fontSize: 16, marginBottom: 6 }}>How to win the duel</h3>
           <ul style={{ paddingLeft: 18, margin: 0 }}>
             <li style={{ marginBottom: 4 }}>
-              The <strong>Breaker</strong> scores points by finding VALID and
-              especially EXACT codes, and by winning in Endgame.
+              The <strong>Breaker</strong> scores points by making{" "}
+              <strong>VALID</strong> guesses, earning extra points for{" "}
+              <strong>EXACT</strong> guesses, and by{" "}
+              <strong>finding the secret code before running out of Endgame attempts</strong>.
             </li>
             <li style={{ marginBottom: 4 }}>
-              The <strong>Patcher</strong> scores points when the Breaker makes
-              INVALID guesses or fails to find the code in Endgame.
+              The <strong>Patcher</strong> scores points when the Breaker makes{" "}
+              <strong>INVALID</strong> guesses, and they{" "}
+              <strong>win Endgame (and score additional points)</strong> if the
+              Breaker runs out of attempts without finding the exact code.
             </li>
             <li>
               After you play however many rounds you want, compare scores –{" "}
