@@ -62,6 +62,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           <h2 id="how-to-play-title" style={{ fontSize: 20, margin: 0 }}>
             How to Play RuleShift
           </h2>
+
           <button
             onClick={onClose}
             style={{
@@ -82,27 +83,19 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
         <section style={{ marginBottom: 12 }}>
           <h3 style={{ fontSize: 16, marginBottom: 6 }}>Roles</h3>
           <ul style={{ paddingLeft: 18, margin: 0 }}>
-            <li style={{ marginBottom: 4 }}>
+            <li>
               <strong>Patcher</strong>{" "}
-              {currentPatcherName !== "?"
-                ? `(${currentPatcherName})`
-                : "(Player 1)"}{" "}
-              tightens the system. Each round the Patcher:
+              {currentPatcherName !== "?" ? `(${currentPatcherName})` : ""}  
+              creates:
               <ul style={{ paddingLeft: 18, marginTop: 4 }}>
-                <li>Chooses one new rule template (e.g. “No repeats”).</li>
-                <li>
-                  Then picks a secret 4-character code (A–Z, 0–9) that obeys{" "}
-                  <strong>all active rules</strong> (old + new).
-                </li>
+                <li>A secret 4-character code (A–Z, 0–9)</li>
+                <li>A rule the code must obey</li>
               </ul>
             </li>
-            <li>
+            <li style={{ marginTop: 4 }}>
               <strong>Breaker</strong>{" "}
-              {currentBreakerName !== "?"
-                ? `(${currentBreakerName})`
-                : "(Player 2)"}{" "}
-              tries to deduce the secret code by guessing codes and reading the
-              feedback.
+              {currentBreakerName !== "?" ? `(${currentBreakerName})` : ""}  
+              attempts to find a code that satisfies the rule system.
             </li>
           </ul>
         </section>
@@ -110,36 +103,33 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
         {/* Objective */}
         <section style={{ marginBottom: 12 }}>
           <h3 style={{ fontSize: 16, marginBottom: 6 }}>Objective</h3>
-          <p style={{ margin: 0 }}>
-            The Patcher keeps adding rules that shrink the space of possible
-            codes. The Breaker tries to find the exact secret code while the
-            system grows tighter and tighter. When only a small number of codes
-            are still valid, the game enters <strong>Endgame</strong>, where
-            every guess matters much more.
+          <p>
+            The Breaker’s goal is to discover a <strong>VALID</strong> code —
+            one that satisfies <em>every</em> rule.  
+            The Patcher tries to shape the rules so the Breaker struggles to do
+            so, especially once the game enters <strong>Endgame</strong>.
           </p>
         </section>
 
-        {/* Guess feedback */}
+        {/* Feedback meanings */}
         <section style={{ marginBottom: 12 }}>
-          <h3 style={{ fontSize: 16, marginBottom: 6 }}>Guess feedback</h3>
+          <h3 style={{ fontSize: 16, marginBottom: 6 }}>Guess Feedback</h3>
+
           <ul style={{ paddingLeft: 18, margin: 0 }}>
             <li style={{ marginBottom: 4 }}>
-              <strong>INVALID</strong> – Your guess breaks{" "}
-              <strong>at least one rule</strong>. The Patcher scores when this
-              happens. INVALID guesses never count as a solution.
+              <strong>VALID</strong> — The guess satisfies all rules.  
+              This resolves the round immediately (including in Endgame).
             </li>
+
             <li style={{ marginBottom: 4 }}>
-              <strong>VALID</strong> – Your guess obeys{" "}
-              <strong>all current rules</strong>, but it’s not the secret code.
-              You’ve found a code that still fits the Patcher’s constraints, and
-              the Breaker scores.
+              <strong>EXACT</strong> — The guess is both VALID and the  
+              <strong>Patcher’s secret code</strong>.  
+              In Endgame, this wins the entire duel.
             </li>
+
             <li>
-              <strong>EXACT</strong> – Your guess is{" "}
-              <strong>exactly the secret code</strong>. In normal play, this is
-              treated like a strong VALID guess for scoring. In{" "}
-              <strong>Endgame</strong>, an EXACT guess immediately ends the
-              round and wins Endgame for the Breaker.
+              <strong>INVALID</strong> — The guess breaks one or more rules.  
+              In Endgame, INVALID guesses consume limited attempts.
             </li>
           </ul>
         </section>
@@ -147,153 +137,58 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
         {/* Endgame */}
         <section style={{ marginBottom: 12 }}>
           <h3 style={{ fontSize: 16, marginBottom: 6 }}>Endgame</h3>
-          <p style={{ marginBottom: 6 }}>
-            Endgame begins automatically once the rule system has been tightened
-            so much that only <strong>25 or fewer valid codes remain</strong>.
+          <p>
+            Endgame begins once the rule system is so tight that
+            <strong>25 or fewer</strong> valid codes remain.
           </p>
+
           <ul style={{ paddingLeft: 18, margin: 0 }}>
-            <li style={{ marginBottom: 4 }}>
-              The Breaker is given a{" "}
-              <strong>limited number of final attempts</strong>.
-            </li>
-            <li style={{ marginBottom: 4 }}>
-              Each <strong>INVALID</strong> guess uses up one Endgame attempt.
-              VALID guesses do not spend attempts.
-            </li>
-            <li style={{ marginBottom: 4 }}>
-              If the Breaker finds an <strong>EXACT</strong> code during
-              Endgame, the round ends immediately and the{" "}
-              <strong>Breaker wins Endgame</strong>.
+            <li>INVALID guesses reduce your remaining attempts.</li>
+            <li>VALID guesses immediately end the round — no attempts lost.</li>
+            <li>
+              Only an <strong>EXACT</strong> guess wins the duel for the
+              Breaker in Endgame.
             </li>
             <li>
-              If the Breaker runs out of attempts without an EXACT guess, the{" "}
-              <strong>Patcher wins Endgame</strong>.
+              If attempts reach zero <em>before</em> the Breaker produces a VALID
+              or EXACT, the <strong>Patcher wins the duel</strong>.
             </li>
           </ul>
         </section>
 
         {/* Turn order */}
         <section style={{ marginBottom: 12 }}>
-          <h3 style={{ fontSize: 16, marginBottom: 6 }}>Turn order</h3>
+          <h3 style={{ fontSize: 16, marginBottom: 6 }}>Turn Order</h3>
+
           <ol style={{ paddingLeft: 18, margin: 0 }}>
-            <li style={{ marginBottom: 4 }}>
-              Both players join the same room and enter their names.
-            </li>
-            <li style={{ marginBottom: 4 }}>
-              One player is randomly assigned as <strong>Patcher</strong>, the
-              other as <strong>Breaker</strong> for this round.
-            </li>
-            <li style={{ marginBottom: 4 }}>
-              Patcher chooses:
-              <ul style={{ paddingLeft: 18, marginTop: 4 }}>
-                <li>One new rule template (e.g. “No repeated characters”).</li>
-                <li>
-                  Then a secret 4-character code (A–Z, 0–9) that follows{" "}
-                  <strong>all active rules</strong>.
-                </li>
-              </ul>
-            </li>
-            <li style={{ marginBottom: 4 }}>
-              Breaker starts guessing codes that must respect{" "}
-              <strong>all visible rules</strong>.
-            </li>
-            <li style={{ marginBottom: 4 }}>
-              After each guess, the system returns{" "}
-              <strong>INVALID / VALID / EXACT</strong> and updates scores.
-            </li>
-            <li>
-              After the round resolves, roles swap and a new round begins (you
-              can play multiple rounds in one duel).
-            </li>
+            <li>Both players join a room and enter names.</li>
+            <li>One player becomes Patcher, the other Breaker.</li>
+            <li>Patcher sets a rule and a secret code.</li>
+            <li>Breaker makes guesses and receives feedback.</li>
+            <li>VALID → round resolved; EXACT → special success.</li>
+            <li>In Endgame, only EXACT ends the duel.</li>
+            <li>After a resolved round, roles switch and play continues.</li>
           </ol>
         </section>
 
-        {/* How to win */}
+        {/* Winning the duel */}
         <section style={{ marginBottom: 12 }}>
-          <h3 style={{ fontSize: 16, marginBottom: 6 }}>How to win the duel</h3>
+          <h3 style={{ fontSize: 16, marginBottom: 6 }}>Winning the Duel</h3>
+
           <ul style={{ paddingLeft: 18, margin: 0 }}>
-            <li style={{ marginBottom: 4 }}>
-              The <strong>Breaker</strong> scores points by making{" "}
-              <strong>VALID</strong> guesses (including EXACT ones) and by{" "}
-              <strong>winning Endgame</strong> with an EXACT guess when attempts
-              are limited.
-            </li>
-            <li style={{ marginBottom: 4 }}>
-              The <strong>Patcher</strong> scores points when the Breaker makes{" "}
-              <strong>INVALID</strong> guesses, and earns additional points by{" "}
-              <strong>winning Endgame</strong> when the Breaker runs out of
-              attempts without finding the exact code.
+            <li>
+              <strong>Breaker wins the duel</strong> by hitting an EXACT guess
+              during Endgame.
             </li>
             <li>
-              After you play however many rounds you want, compare scores –{" "}
-              <strong>highest total score wins</strong> the duel.
+              <strong>Patcher wins the duel</strong> if the Breaker runs out of
+              Endgame attempts without producing a VALID or EXACT guess.
             </li>
           </ul>
         </section>
 
-        {/* Visual flow */}
-        <section style={{ marginBottom: 12 }}>
-          <h3 style={{ fontSize: 16, marginBottom: 6 }}>Round flow (visual)</h3>
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              alignItems: "center",
-              fontSize: 13,
-            }}
-          >
-            <div
-              style={{
-                padding: "6px 10px",
-                borderRadius: 999,
-                border: "1px solid #4b5563",
-              }}
-            >
-              Patcher: rule + code
-            </div>
-            <span>→</span>
-            <div
-              style={{
-                padding: "6px 10px",
-                borderRadius: 999,
-                border: "1px solid #4b5563",
-              }}
-            >
-              Rules panel updates
-            </div>
-            <span>→</span>
-            <div
-              style={{
-                padding: "6px 10px",
-                borderRadius: 999,
-                border: "1px solid #4b5563",
-              }}
-            >
-              Breaker: guess
-            </div>
-            <span>→</span>
-            <div
-              style={{
-                padding: "6px 10px",
-                borderRadius: 999,
-                border: "1px solid #4b5563",
-              }}
-            >
-              Feedback: INVALID / VALID / EXACT
-            </div>
-          </div>
-        </section>
-
-        {/* Footer button */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: 8,
-            marginTop: 16,
-          }}
-        >
+        {/* Close */}
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
           <button
             onClick={onClose}
             style={{
@@ -306,7 +201,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
               fontSize: 13,
             }}
           >
-            Got it, let’s play
+            Got it — Let’s play
           </button>
         </div>
       </div>
