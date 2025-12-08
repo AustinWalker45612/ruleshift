@@ -37,17 +37,46 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
               Welcome to RuleShift
             </h2>
             <p style={{ fontSize: 14, opacity: 0.9, marginBottom: 8 }}>
-              RuleShift is a two-player deduction duel. One player tightens the
-              rule system, the other tries to break it.
+              RuleShift is a two-player deduction duel. One player shapes the
+              rule system, the other tries to break through it.
             </p>
             <ul style={{ paddingLeft: 18, fontSize: 14, margin: 0 }}>
-              <li style={{ marginBottom: 4 }}>
-                <strong>Patcher</strong> adds new rules and secretly picks a
-                code that follows all of them.
+              <li style={{ marginBottom: 6 }}>
+                <strong>Patcher</strong> creates each round:
+                <br />• one new rule the code must obey
+                <br />• a secret 4-character code (A–Z, 0–9) that follows{" "}
+                <strong>all</strong> rules so far.
+              </li>
+              <li style={{ marginBottom: 6 }}>
+                <strong>Breaker</strong> attempts to find a code that satisfies
+                the entire visible rule system.
+              </li>
+              <li style={{ marginBottom: 6 }}>
+                Outside Endgame, the Breaker&apos;s core objective is to
+                discover a <strong>VALID</strong> code — any code that satisfies
+                every rule. A VALID guess ends the round and swaps roles.
+              </li>
+              <li style={{ marginBottom: 6 }}>
+                A guess can be:
+                <br />
+                <strong>INVALID</strong> — breaks at least one rule.
+                <br />
+                <strong>VALID</strong> — satisfies all rules but isn&apos;t the
+                secret code (round ends, roles swap).
+                <br />
+                <strong>EXACT</strong> — the Patcher&apos;s secret code itself
+                (the Breaker wins the duel).
               </li>
               <li>
-                <strong>Breaker</strong> guesses codes and uses the feedback
-                (INVALID / VALID / EXACT) to narrow in on the secret.
+                The Patcher&apos;s job is to shape the rules so that finding a
+                VALID code is hard, especially once the rules shrink the space
+                down to{" "}
+                <strong>25 or fewer valid codes</strong>. At that point the duel
+                enters <strong>Endgame</strong>, where attempts are limited,
+                INVALID guesses burn those attempts, VALID still only{" "}
+                <strong>ends the round</strong>, and{" "}
+                <strong>only an EXACT guess</strong> wins the duel for the
+                Breaker.
               </li>
             </ul>
           </>
@@ -68,18 +97,32 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
                 <strong>all active rules (old + new)</strong>.
               </li>
               <li style={{ marginBottom: 4 }}>
+                The <strong>newest rule is hidden</strong> from the Breaker for
+                this round. They only see the older rules.
+              </li>
+              <li style={{ marginBottom: 4 }}>
                 <strong>Breaker</strong> starts guessing codes that must follow
                 every visible rule.
               </li>
               <li style={{ marginBottom: 4 }}>
                 The system labels each guess as{" "}
-                <strong>INVALID / VALID / EXACT</strong> and updates the score.
+                <strong>INVALID / VALID / EXACT</strong> and updates the duel
+                state:
+                <br />
+                • INVALID burns an attempt but the round continues.
+                <br />
+                • VALID ends the round (roles swap, duel continues).
+                <br />
+                • EXACT ends the duel (Breaker wins).
               </li>
               <li>
                 When the rules shrink the space down to{" "}
                 <strong>25 or fewer valid codes</strong>, the game enters{" "}
-                <strong>Endgame</strong>, where INVALID guesses burn limited
-                attempts and an EXACT guess immediately wins the round.
+                <strong>Endgame</strong>: INVALID guesses burn from a{" "}
+                <strong>limited attempt pool</strong>, a VALID guess still just{" "}
+                <strong>ends the round</strong>, and{" "}
+                <strong>only an EXACT guess</strong> wins the duel for the
+                Breaker.
               </li>
             </ol>
           </>
@@ -108,7 +151,8 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
                 }}
               >
                 <strong>Top bar</strong>: round, scores, who&apos;s Patcher /
-                Breaker.
+                Breaker, and whether you&apos;re in{" "}
+                <strong>Endgame</strong>.
               </div>
               <div
                 style={{
@@ -118,8 +162,9 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
                   fontSize: 13,
                 }}
               >
-                <strong>Active Rules</strong>: all constraints the code must
-                follow.
+                <strong>Active Rules</strong>: the visible constraints the code
+                must follow. (The newest rule is hidden from the Breaker until
+                the round ends.)
               </div>
               <div
                 style={{
@@ -129,8 +174,8 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
                   fontSize: 13,
                 }}
               >
-                <strong>Center panel</strong>: where Patcher sets rules and
-                code, or Breaker submits guesses.
+                <strong>Center panel</strong>: where the Patcher sets rules and
+                code, or the Breaker submits guesses and sees results.
               </div>
               <div
                 style={{
@@ -141,7 +186,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
                 }}
               >
                 <strong>Duel History</strong>: previous rounds (who patched
-                what, and the secret codes).
+                what, which rules were added, and the secret codes).
               </div>
             </div>
             <p style={{ fontSize: 13, opacity: 0.85 }}>
