@@ -50,6 +50,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -86,16 +87,21 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
               {currentPatcherName !== "?"
                 ? `(${currentPatcherName})`
                 : "(Player 1)"}{" "}
-              chooses a secret 4-character code using <strong>A–Z</strong> and{" "}
-              <strong>0–9</strong>, then programs a rule that the code must obey
-              (e.g. “Position 1 must be 7”, “No repeated characters”, etc.).
+              tightens the system. Each round the Patcher:
+              <ul style={{ paddingLeft: 18, marginTop: 4 }}>
+                <li>Chooses one new rule template (e.g. “No repeats”).</li>
+                <li>
+                  Then picks a secret 4-character code (A–Z, 0–9) that obeys{" "}
+                  <strong>all active rules</strong> (old + new).
+                </li>
+              </ul>
             </li>
             <li>
               <strong>Breaker</strong>{" "}
               {currentBreakerName !== "?"
                 ? `(${currentBreakerName})`
                 : "(Player 2)"}{" "}
-              tries to deduce the secret code by making guesses and reading the
+              tries to deduce the secret code by guessing codes and reading the
               feedback.
             </li>
           </ul>
@@ -106,10 +112,10 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           <h3 style={{ fontSize: 16, marginBottom: 6 }}>Objective</h3>
           <p style={{ margin: 0 }}>
             The Patcher keeps adding rules that shrink the space of possible
-            codes. The Breaker tries to find the exact secret code{" "}
-            <strong>before they run out of attempts</strong>, especially once
-            the game enters <strong>Endgame</strong> (when only a small number
-            of codes are still valid).
+            codes. The Breaker tries to find the exact secret code while the
+            system grows tighter and tighter. When only a small number of codes
+            are still valid, the game enters <strong>Endgame</strong>, where
+            every guess matters much more.
           </p>
         </section>
 
@@ -118,18 +124,22 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           <h3 style={{ fontSize: 16, marginBottom: 6 }}>Guess feedback</h3>
           <ul style={{ paddingLeft: 18, margin: 0 }}>
             <li style={{ marginBottom: 4 }}>
-              <strong>EXACT</strong> – Your guess is{" "}
-              <strong>exactly the secret code</strong>.
+              <strong>INVALID</strong> – Your guess breaks{" "}
+              <strong>at least one rule</strong>. The Patcher scores when this
+              happens. INVALID guesses never count as a solution.
             </li>
             <li style={{ marginBottom: 4 }}>
               <strong>VALID</strong> – Your guess obeys{" "}
               <strong>all current rules</strong>, but it’s not the secret code.
-              You’ve found a code that still fits the Patcher’s constraints.
+              You’ve found a code that still fits the Patcher’s constraints, and
+              the Breaker scores.
             </li>
             <li>
-              <strong>INVALID</strong> – Your guess breaks{" "}
-              <strong>at least one rule</strong>. In Endgame, invalid guesses
-              also burn your remaining attempts.
+              <strong>EXACT</strong> – Your guess is{" "}
+              <strong>exactly the secret code</strong>. In normal play, this is
+              treated like a strong VALID guess for scoring. In{" "}
+              <strong>Endgame</strong>, an EXACT guess immediately ends the
+              round and wins Endgame for the Breaker.
             </li>
           </ul>
         </section>
@@ -147,19 +157,16 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
               <strong>limited number of final attempts</strong>.
             </li>
             <li style={{ marginBottom: 4 }}>
-              Each <strong>INVALID</strong> guess uses up one of those
-              attempts.
+              Each <strong>INVALID</strong> guess uses up one Endgame attempt.
+              VALID guesses do not spend attempts.
             </li>
             <li style={{ marginBottom: 4 }}>
-              <strong>VALID</strong> guesses do not spend attempts, but must
-              still follow every rule.
-            </li>
-            <li style={{ marginBottom: 4 }}>
-              If the Breaker finds the <strong>exact</strong> code before
-              running out of attempts, they <strong>win Endgame</strong>.
+              If the Breaker finds an <strong>EXACT</strong> code during
+              Endgame, the round ends immediately and the{" "}
+              <strong>Breaker wins Endgame</strong>.
             </li>
             <li>
-              If they run out of attempts without finding the code, the{" "}
+              If the Breaker runs out of attempts without an EXACT guess, the{" "}
               <strong>Patcher wins Endgame</strong>.
             </li>
           </ul>
@@ -179,8 +186,11 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
             <li style={{ marginBottom: 4 }}>
               Patcher chooses:
               <ul style={{ paddingLeft: 18, marginTop: 4 }}>
-                <li>A secret 4-character code (A–Z, 0–9).</li>
-                <li>One new rule template (e.g. “Position 2 must be a digit”).</li>
+                <li>One new rule template (e.g. “No repeated characters”).</li>
+                <li>
+                  Then a secret 4-character code (A–Z, 0–9) that follows{" "}
+                  <strong>all active rules</strong>.
+                </li>
               </ul>
             </li>
             <li style={{ marginBottom: 4 }}>
@@ -204,15 +214,15 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           <ul style={{ paddingLeft: 18, margin: 0 }}>
             <li style={{ marginBottom: 4 }}>
               The <strong>Breaker</strong> scores points by making{" "}
-              <strong>VALID</strong> guesses, earning extra points for{" "}
-              <strong>EXACT</strong> guesses, and by{" "}
-              <strong>finding the secret code before running out of Endgame attempts</strong>.
+              <strong>VALID</strong> guesses (including EXACT ones) and by{" "}
+              <strong>winning Endgame</strong> with an EXACT guess when attempts
+              are limited.
             </li>
             <li style={{ marginBottom: 4 }}>
               The <strong>Patcher</strong> scores points when the Breaker makes{" "}
-              <strong>INVALID</strong> guesses, and they{" "}
-              <strong>win Endgame (and score additional points)</strong> if the
-              Breaker runs out of attempts without finding the exact code.
+              <strong>INVALID</strong> guesses, and earns additional points by{" "}
+              <strong>winning Endgame</strong> when the Breaker runs out of
+              attempts without finding the exact code.
             </li>
             <li>
               After you play however many rounds you want, compare scores –{" "}
@@ -240,7 +250,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
                 border: "1px solid #4b5563",
               }}
             >
-              Patcher: code + rule
+              Patcher: rule + code
             </div>
             <span>→</span>
             <div
@@ -275,6 +285,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           </div>
         </section>
 
+        {/* Footer button */}
         <div
           style={{
             display: "flex",

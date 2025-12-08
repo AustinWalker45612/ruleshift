@@ -18,6 +18,7 @@ import ResultScreens from "./components/ResultScreens";
 import { PatcherView } from "./components/PatcherView";
 import { BreakerView } from "./components/BreakerView";
 import { HowToPlayModal } from "./components/HowToPlayModal";
+import { OnboardingOverlay } from "./components/OnboardingOverlay";
 
 type Player = {
   name: string;
@@ -280,8 +281,30 @@ const App: React.FC = () => {
   const [templatesAvailableForCurrentRound, setTemplatesAvailableForCurrentRound] =
     useState<TemplateOptionSummary[]>([]);
 
-  // How to Play modal visibility
+  // How to Play modal visibility (opened via button only now)
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+
+  // Onboarding overlay: show once per device
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const seen = window.localStorage.getItem("ruleshiftOnboardingSeen_v1");
+      return !seen; // show if not seen yet
+    } catch {
+      return true;
+    }
+  });
+
+  const handleCloseOnboarding = () => {
+    setShowOnboarding(false);
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("ruleshiftOnboardingSeen_v1", "true");
+      }
+    } catch {
+      // ignore storage errors
+    }
+  };
 
   const currentPatcher = players[currentPatcherIndex];
   const currentBreakerIndex = 1 - currentPatcherIndex;
@@ -504,21 +527,6 @@ const App: React.FC = () => {
       }
     }
   }, [phase, isEndgameWindow, endgameStats]);
-
-  // Show How to Play automatically once per device
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      const key = "ruleshiftHasSeenHowToPlay";
-      const hasSeen = window.localStorage.getItem(key);
-      if (!hasSeen) {
-        setShowHowToPlay(true);
-        window.localStorage.setItem(key, "true");
-      }
-    } catch {
-      // ignore localStorage issues
-    }
-  }, []);
 
   // Visible rules in the UI:
   // During breakerTurn we hide ONLY the newest rule.
@@ -1292,6 +1300,12 @@ const App: React.FC = () => {
         color: "#e5e7eb",
       }}
     >
+      {/* Onboarding overlay (first-time players, per device) */}
+      <OnboardingOverlay
+        isOpen={showOnboarding}
+        onClose={handleCloseOnboarding}
+      />
+
       <div
         style={{
           width: "100%",
