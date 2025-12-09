@@ -19,6 +19,8 @@ import { PatcherView } from "./components/PatcherView";
 import { BreakerView } from "./components/BreakerView";
 import { HowToPlayModal } from "./components/HowToPlayModal";
 import { OnboardingOverlay } from "./components/OnboardingOverlay";
+import type {TutorialRole} from "./components/TutorialOverlay";
+import { TutorialOverlay } from "./components/TutorialOverlay";
 
 type Player = {
   name: string;
@@ -110,6 +112,9 @@ type SyncedState = {
 
   sender?: string;
 };
+
+// Tutorial mode for the local client-only examples
+type TutorialMode = TutorialRole | "none";
 
 // Helper: parse initial room from URL like /room/ABCD
 const getInitialRoomFromUrl = (): string | null => {
@@ -305,6 +310,9 @@ const App: React.FC = () => {
       // ignore storage errors
     }
   };
+
+  // Tutorial overlay mode (local-only examples)
+  const [tutorialMode, setTutorialMode] = useState<TutorialMode>("none");
 
   const currentPatcher = players[currentPatcherIndex];
   const currentBreakerIndex = 1 - currentPatcherIndex;
@@ -1446,6 +1454,22 @@ const App: React.FC = () => {
             >
               ❓ How to play
             </button>
+
+            <button
+              onClick={() => setTutorialMode("breaker")}
+              style={{
+                borderRadius: 999,
+                padding: "6px 12px",
+                border: "1px solid #4b5563",
+                background: "#020617",
+                color: "#e5e7eb",
+                cursor: "pointer",
+                fontSize: 12,
+                whiteSpace: "nowrap",
+              }}
+            >
+              🧠 Examples (Breaker / Patcher)
+            </button>
           </div>
         </header>
 
@@ -1974,6 +1998,13 @@ const App: React.FC = () => {
           onClose={() => setShowHowToPlay(false)}
           currentPatcherName={currentPatcherName}
           currentBreakerName={currentBreakerName}
+        />
+
+        {/* TUTORIAL OVERLAY — LOCAL EXAMPLES FOR BREAKER/PATCHER */}
+        <TutorialOverlay
+          isOpen={tutorialMode !== "none"}
+          initialRole={tutorialMode === "none" ? "breaker" : tutorialMode}
+          onClose={() => setTutorialMode("none")}
         />
       </div>
     </div>

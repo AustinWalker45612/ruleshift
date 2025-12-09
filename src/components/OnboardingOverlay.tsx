@@ -49,7 +49,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
               </li>
               <li style={{ marginBottom: 6 }}>
                 <strong>Breaker</strong> attempts to find a code that satisfies
-                the entire visible rule system.
+                the entire rule system.
               </li>
               <li style={{ marginBottom: 6 }}>
                 Outside Endgame, the Breaker&apos;s core objective is to
@@ -65,7 +65,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
                 secret code (round ends, roles swap).
                 <br />
                 <strong>EXACT</strong> — the Patcher&apos;s secret code itself
-                (the Breaker wins the duel).
+                (the Breaker Gains extra points).
               </li>
               <li>
                 The Patcher&apos;s job is to shape the rules so that finding a
@@ -102,7 +102,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
               </li>
               <li style={{ marginBottom: 4 }}>
                 <strong>Breaker</strong> starts guessing codes that must follow
-                every visible rule.
+                every rule.
               </li>
               <li style={{ marginBottom: 4 }}>
                 The system labels each guess as{" "}
