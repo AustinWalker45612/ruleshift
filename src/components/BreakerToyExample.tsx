@@ -3,155 +3,171 @@ import React, { useState } from "react";
 import type { Rule } from "../game/gameTypes";
 import { CODE_REGEX, passesAllRules } from "../game/rulesEngine";
 
-type ToyResult = "INVALID" | "VALID" | "EXACT";
+// Fixed secret code for this toy example
+const TOY_SECRET_CODE = "A2B4";
 
-type ToyGuess = {
-  value: string;
-  result: ToyResult;
-  explanation: string;
-};
-
-// Simple toy rules to match your text example:
-// Visible rules:
-// • Code is 4 characters (A–Z, 0–9).
-// • No repeated characters.
+// Toy rule system: 4 interlocking rules
 const TOY_RULES: Rule[] = [
   {
     id: 1,
     type: "allUnique",
     description: "All 4 characters must be unique (no repeats).",
   },
+  {
+    id: 2,
+    type: "exactLettersDigits",
+    letters: 2,
+    digits: 2,
+    description: "Exactly 2 letters and 2 digits.",
+  },
+  {
+    id: 3,
+    type: "positionKind",
+    position: 0, // position 1 in UI
+    kind: "letter",
+    description: "Position 1 must be a letter.",
+  },
+  {
+    id: 4,
+    type: "digitsLessThan",
+    maxDigit: 5,
+    description: "All digits must be less than 5.",
+  },
 ];
 
-// In this toy you can think of visibleRules === full rules.
-const VISIBLE_RULES = TOY_RULES;
+type ToyResult = "INVALID" | "VALID" | "EXACT";
 
-// Fixed secret code for the example.
-const SECRET_CODE = "AB12";
+type ToyGuess = {
+  value: string;
+  result: ToyResult;
+};
 
 export const BreakerToyExample: React.FC = () => {
-  const [guess, setGuess] = useState("");
-  const [guesses, setGuesses] = useState<ToyGuess[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<ToyGuess[]>([]);
 
   const handleSubmit = () => {
-    const raw = guess.toUpperCase().trim();
-    setMessage(null);
+    setError(null);
+    const guess = input.toUpperCase().trim();
 
-    if (!CODE_REGEX.test(raw)) {
-      setMessage(
-        "Guess must be exactly 4 characters using A–Z or 0–9 (no spaces or symbols)."
-      );
+    // Basic format check
+    if (!CODE_REGEX.test(guess)) {
+      setError("Guess must be exactly 4 characters, A–Z or 0–9.");
       return;
     }
 
-    // First: ensure it would be allowed by visible rules (like the real game)
-    const passesVisible = passesAllRules(raw, VISIBLE_RULES);
-    if (!passesVisible) {
-      // With this toy ruleset, failing visible rules means you're repeating chars.
-      setMessage(
-        "This would be rejected immediately: it repeats at least one character and breaks the 'no repeats' rule."
-      );
-      return;
-    }
-
-    const systemValid = passesAllRules(raw, TOY_RULES);
+    // Evaluate against toy rules
+    const obeysRules = passesAllRules(guess, TOY_RULES);
 
     let result: ToyResult;
-    let explanation: string;
-
-    if (!systemValid) {
-      // (With this toy there is only one rule, so this branch won’t actually hit,
-      // but we keep it for clarity / future tweaks.)
+    if (!obeysRules) {
       result = "INVALID";
-      explanation =
-        "INVALID: this breaks at least one active rule. In this toy, that means you repeated a character somewhere.";
-    } else if (raw === SECRET_CODE) {
+    } else if (guess === TOY_SECRET_CODE) {
       result = "EXACT";
-      explanation =
-        "EXACT: you hit the secret code. In a real duel this would end the duel immediately.";
     } else {
       result = "VALID";
-      explanation =
-        "VALID: this obeys all rules but isn’t the secret. In a real duel this would end the round and swap roles.";
     }
 
-    const newEntry: ToyGuess = {
-      value: raw,
-      result,
-      explanation,
-    };
+    // Newest results at the TOP of the list
+    setHistory((prev) => [{ value: guess, result }, ...prev]);
 
-    setGuesses((prev) => [...prev, newEntry]);
-    setGuess("");
+    // Clear the input for next guess
+    setInput("");
   };
 
   return (
     <div
       style={{
         marginTop: 10,
-        padding: 12,
+        padding: 10,
         borderRadius: 12,
-        background: "#020617",
         border: "1px solid #1f2937",
+        background: "#020617",
         fontSize: 13,
       }}
     >
-      <div
-        style={{
-          marginBottom: 6,
-          fontWeight: 600,
-        }}
-      >
-        Toy example (now interactive):
-      </div>
-
-      <div style={{ marginBottom: 6 }}>
-        <div style={{ fontWeight: 500, marginBottom: 2 }}>Visible rules:</div>
-        <ul style={{ margin: 0, paddingLeft: 18 }}>
-          <li>Code is 4 characters (A–Z, 0–9).</li>
-          <li>No repeated characters.</li>
-        </ul>
-      </div>
-
-      <p style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>
-        Try a guess like <code>AA12</code> and compare it to something like{" "}
-        <code>AB12</code>. Watch how INVALID vs VALID behave. The secret code in
-        this toy is fixed but hidden.
+      <p style={{ marginBottom: 6, opacity: 0.9 }}>
+        <strong>Try it as the Breaker</strong>{" "}
+        <span style={{ opacity: 0.8 }}>
+          (toy position, not a live round):
+        </span>
       </p>
 
+      {/* Rule summary */}
+      <div
+        style={{
+          marginBottom: 8,
+          padding: 8,
+          borderRadius: 8,
+          background: "#020617",
+          border: "1px solid #111827",
+        }}
+      >
+        <div style={{ marginBottom: 4, fontWeight: 500 }}>
+          Example rule set:
+        </div>
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <li>All 4 characters must be unique.</li>
+          <li>Exactly 2 letters and 2 digits.</li>
+          <li>Position 1 must be a letter.</li>
+          <li>All digits must be less than 5.</li>
+        </ul>
+        <p
+          style={{
+            marginTop: 6,
+            marginBottom: 0,
+            fontSize: 11,
+            opacity: 0.7,
+          }}
+        >
+          In a real duel, the <strong>newest rule is hidden</strong> from the
+          Breaker each round. Here, all rules are shown so you can see how the
+          feedback lines up with the full rule system.
+        </p>
+      </div>
+
+      {/* Input + button */}
       <div
         style={{
           display: "flex",
           gap: 8,
-          marginBottom: 8,
           alignItems: "center",
+          marginBottom: 6,
         }}
       >
         <input
-          value={guess}
-          onChange={(e) => setGuess(e.target.value)}
+          value={input}
+          onChange={(e) => {
+            const raw = e.target.value.toUpperCase();
+            // Only allow A–Z, 0–9 and clamp to 4 chars
+            const trimmed = raw.replace(/[^A-Z0-9]/g, "").slice(0, 4);
+            setInput(trimmed);
+          }}
+          maxLength={4}
+          placeholder="e.g. A2B4"
+          style={{
+            flex: "0 0 120px",
+            padding: "6px 8px",
+            borderRadius: 8,
+            border: "1px solid #374151",
+            background: "#020617",
+            color: "#e5e7eb",
+            fontSize: 13,
+            textTransform: "uppercase",
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
               handleSubmit();
             }
           }}
-          placeholder="Try a 4-char code (e.g. AA12)"
-          style={{
-            flex: 1,
-            padding: "6px 10px",
-            borderRadius: 999,
-            border: "1px solid #4b5563",
-            background: "#020617",
-            color: "#e5e7eb",
-            fontSize: 13,
-          }}
         />
+
         <button
           onClick={handleSubmit}
           style={{
-            padding: "6px 14px",
+            padding: "6px 10px",
             borderRadius: 999,
             border: "none",
             background: "#22c55e",
@@ -162,120 +178,88 @@ export const BreakerToyExample: React.FC = () => {
             whiteSpace: "nowrap",
           }}
         >
-          Try guess
+          Check guess
         </button>
       </div>
 
-      {message && (
+      {/* Error */}
+      {error && (
         <div
           style={{
-            marginBottom: 8,
-            padding: 6,
-            borderRadius: 8,
-            background: "#0f172a",
-            border: "1px solid #4b5563",
+            marginBottom: 6,
             fontSize: 12,
+            color: "#f97373",
           }}
         >
-          {message}
+          {error}
         </div>
       )}
 
+      {/* History */}
       <div
         style={{
-          maxHeight: 180,
+          maxHeight: 150,
           overflowY: "auto",
-          padding: 6,
           borderRadius: 8,
-          background: "#020617",
           border: "1px solid #111827",
-          fontSize: 12,
+          padding: 6,
         }}
       >
-        <div
-          style={{
-            marginBottom: 4,
-            fontWeight: 500,
-          }}
-        >
-          Your guesses
-        </div>
-        {guesses.length === 0 ? (
-          <p style={{ opacity: 0.7, margin: 0 }}>
-            Your guesses and explanations will appear here.
+        {history.length === 0 ? (
+          <p style={{ margin: 0, opacity: 0.7, fontSize: 12 }}>
+            Try a few guesses and see whether they come back INVALID, VALID, or
+            EXACT under this rule system.
           </p>
         ) : (
-          guesses.map((g, idx) => {
-            let badgeBg = "#4b5563";
-            let badgeText = "#e5e7eb";
-            if (g.result === "INVALID") {
-              badgeBg = "#991b1b";
-              badgeText = "#fee2e2";
-            } else if (g.result === "VALID") {
-              badgeBg = "#92400e";
-              badgeText = "#ffedd5";
-            } else if (g.result === "EXACT") {
-              badgeBg = "#166534";
-              badgeText = "#bbf7d0";
-            }
-
-            return (
-              <div
-                key={idx}
+          <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+            {history.map((g, idx) => (
+              <li
+                key={`${g.value}-${idx}`}
                 style={{
-                  paddingBottom: 6,
-                  marginBottom: 6,
-                  borderBottom: "1px solid #111827",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "3px 0",
+                  borderBottom:
+                    idx === history.length - 1
+                      ? "none"
+                      : "1px solid rgba(15,23,42,0.8)",
                 }}
               >
-                <div
+                <span
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 8,
+                    fontFamily: "monospace",
+                    letterSpacing: 1,
                   }}
                 >
-                  <span
-                    style={{
-                      fontFamily: "monospace",
-                      letterSpacing: 1,
-                    }}
-                  >
-                    {g.value}
-                  </span>
-                  <span
-                    style={{
-                      padding: "2px 8px",
-                      borderRadius: 999,
-                      fontSize: 11,
-                      background: badgeBg,
-                      color: badgeText,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {g.result}
-                  </span>
-                </div>
-                <div style={{ marginTop: 3, opacity: 0.9 }}>
-                  {g.explanation}
-                </div>
-              </div>
-            );
-          })
+                  {g.value}
+                </span>
+                <span>
+                  {g.result === "INVALID" && (
+                    <span style={{ color: "#f97373" }}>INVALID</span>
+                  )}
+                  {g.result === "VALID" && (
+                    <span style={{ color: "#38bdf8" }}>VALID</span>
+                  )}
+                  {g.result === "EXACT" && (
+                    <span style={{ color: "#facc15" }}>EXACT</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
-      <div
+      <p
         style={{
           marginTop: 6,
           fontSize: 11,
           opacity: 0.7,
         }}
       >
-        This is a mini sandbox – it doesn&apos;t affect your real duel. Use it
-        to practice spotting INVALID patterns quickly.
-      </div>
+        Hint: in this toy, you see every rule. In a real duel, you&apos;d only
+        see the older rules and have to infer the newest one from the feedback.
+      </p>
     </div>
   );
 };
