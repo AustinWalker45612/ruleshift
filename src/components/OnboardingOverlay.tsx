@@ -1,14 +1,18 @@
 // src/components/OnboardingOverlay.tsx
 import React, { useState } from "react";
+import type { TutorialRole } from "./TutorialOverlay";
 
 type OnboardingOverlayProps = {
   isOpen: boolean;
   onClose: () => void;
+  // optional: parent can pass this to jump straight into examples
+  onOpenTutorial?: (role?: TutorialRole) => void;
 };
 
 export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
   isOpen,
   onClose,
+  onOpenTutorial,
 }) => {
   const [step, setStep] = useState<number>(0);
 
@@ -20,7 +24,10 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({
     if (step < totalSteps - 1) {
       setStep((s) => s + 1);
     } else {
+      // finishing onboarding
       onClose();
+      // optionally open tutorials (default to breaker example)
+      onOpenTutorial?.("breaker");
     }
   };
 

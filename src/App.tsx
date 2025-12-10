@@ -19,7 +19,7 @@ import { PatcherView } from "./components/PatcherView";
 import { BreakerView } from "./components/BreakerView";
 import { HowToPlayModal } from "./components/HowToPlayModal";
 import { OnboardingOverlay } from "./components/OnboardingOverlay";
-import type {TutorialRole} from "./components/TutorialOverlay";
+import type { TutorialRole } from "./components/TutorialOverlay";
 import { TutorialOverlay } from "./components/TutorialOverlay";
 
 type Player = {
@@ -313,6 +313,10 @@ const App: React.FC = () => {
 
   // Tutorial overlay mode (local-only examples)
   const [tutorialMode, setTutorialMode] = useState<TutorialMode>("none");
+
+  const openTutorial = (role: TutorialRole = "breaker") => {
+    setTutorialMode(role);
+  };
 
   const currentPatcher = players[currentPatcherIndex];
   const currentBreakerIndex = 1 - currentPatcherIndex;
@@ -1312,6 +1316,7 @@ const App: React.FC = () => {
       <OnboardingOverlay
         isOpen={showOnboarding}
         onClose={handleCloseOnboarding}
+        onOpenTutorial={openTutorial}
       />
 
       <div
@@ -1456,7 +1461,7 @@ const App: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setTutorialMode("breaker")}
+              onClick={() => openTutorial("breaker")}
               style={{
                 borderRadius: 999,
                 padding: "6px 12px",
@@ -1998,6 +2003,7 @@ const App: React.FC = () => {
           onClose={() => setShowHowToPlay(false)}
           currentPatcherName={currentPatcherName}
           currentBreakerName={currentBreakerName}
+          onOpenTutorial={openTutorial}
         />
 
         {/* TUTORIAL OVERLAY — LOCAL EXAMPLES FOR BREAKER/PATCHER */}

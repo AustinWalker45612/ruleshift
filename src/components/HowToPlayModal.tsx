@@ -1,11 +1,14 @@
 // src/components/HowToPlayModal.tsx
 import React from "react";
+import type { TutorialRole } from "./TutorialOverlay";
 
 type HowToPlayModalProps = {
   isOpen: boolean;
   onClose: () => void;
   currentPatcherName: string;
   currentBreakerName: string;
+  // optional: open the tutorial overlay directly from this modal
+  onOpenTutorial?: (role?: TutorialRole) => void;
 };
 
 export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
@@ -13,8 +16,14 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
   onClose,
   currentPatcherName,
   currentBreakerName,
+  onOpenTutorial,
 }) => {
   if (!isOpen) return null;
+
+  const handleOpenTutorial = (role: TutorialRole) => {
+    onClose();
+    onOpenTutorial?.(role);
+  };
 
   return (
     <div
@@ -85,7 +94,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           <ul style={{ paddingLeft: 18, margin: 0 }}>
             <li>
               <strong>Patcher</strong>{" "}
-              {currentPatcherName !== "?" ? `(${currentPatcherName})` : ""}  
+              {currentPatcherName !== "?" ? `(${currentPatcherName})` : ""}{" "}
               creates:
               <ul style={{ paddingLeft: 18, marginTop: 4 }}>
                 <li>A secret 4-character code (A–Z, 0–9)</li>
@@ -94,7 +103,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
             </li>
             <li style={{ marginTop: 4 }}>
               <strong>Breaker</strong>{" "}
-              {currentBreakerName !== "?" ? `(${currentBreakerName})` : ""}  
+              {currentBreakerName !== "?" ? `(${currentBreakerName})` : ""}{" "}
               attempts to find a code that satisfies the rule system.
             </li>
           </ul>
@@ -105,9 +114,9 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           <h3 style={{ fontSize: 16, marginBottom: 6 }}>Objective</h3>
           <p>
             The Breaker’s goal is to discover a <strong>VALID</strong> code —
-            one that satisfies <em>every</em> rule.  
-            The Patcher tries to shape the rules so the Breaker struggles to do
-            so, especially once the game enters <strong>Endgame</strong>.
+            one that satisfies <em>every</em> rule. The Patcher tries to shape
+            the rules so the Breaker struggles to do so, especially once the
+            game enters <strong>Endgame</strong>.
           </p>
         </section>
 
@@ -117,19 +126,19 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
 
           <ul style={{ paddingLeft: 18, margin: 0 }}>
             <li style={{ marginBottom: 4 }}>
-              <strong>VALID</strong> — The guess satisfies all rules.  
-              This resolves the round immediately (including in Endgame).
+              <strong>VALID</strong> — The guess satisfies all rules. This
+              resolves the round immediately (including in Endgame).
             </li>
 
             <li style={{ marginBottom: 4 }}>
-              <strong>EXACT</strong> — The guess is both VALID and the  
-              <strong>Patcher’s secret code</strong>.  
-              In Endgame, this wins the entire duel.
+              <strong>EXACT</strong> — The guess is both VALID and the{" "}
+              <strong>Patcher’s secret code</strong>. In Endgame, this wins the
+              entire duel.
             </li>
 
             <li>
-              <strong>INVALID</strong> — The guess breaks one or more rules.  
-              In Endgame, INVALID guesses consume limited attempts.
+              <strong>INVALID</strong> — The guess breaks one or more rules. In
+              Endgame, INVALID guesses consume limited attempts.
             </li>
           </ul>
         </section>
@@ -138,7 +147,7 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
         <section style={{ marginBottom: 12 }}>
           <h3 style={{ fontSize: 16, marginBottom: 6 }}>Endgame</h3>
           <p>
-            Endgame begins once the rule system is so tight that
+            Endgame begins once the rule system is so tight that{" "}
             <strong>25 or fewer</strong> valid codes remain.
           </p>
 
@@ -150,8 +159,8 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
               Breaker in Endgame.
             </li>
             <li>
-              If attempts reach zero <em>before</em> the Breaker produces a VALID
-              or EXACT, the <strong>Patcher wins the duel</strong>.
+              If attempts reach zero <em>before</em> the Breaker produces a
+              VALID or EXACT, the <strong>Patcher wins the duel</strong>.
             </li>
           </ul>
         </section>
@@ -187,22 +196,71 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
           </ul>
         </section>
 
-        {/* Close */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-          <button
-            onClick={onClose}
-            style={{
-              borderRadius: 999,
-              padding: "6px 14px",
-              border: "1px solid #4b5563",
-              background: "#020617",
-              color: "#e5e7eb",
-              cursor: "pointer",
-              fontSize: 13,
-            }}
-          >
-            Got it — Let’s play
-          </button>
+        {/* Footer actions */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginTop: 16,
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          {onOpenTutorial && (
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                onClick={() => handleOpenTutorial("breaker")}
+                style={{
+                  borderRadius: 999,
+                  padding: "6px 14px",
+                  border: "1px solid #4b5563",
+                  background: "#020617",
+                  color: "#e5e7eb",
+                  cursor: "pointer",
+                  fontSize: 13,
+                }}
+              >
+                See example as Breaker
+              </button>
+              <button
+                onClick={() => handleOpenTutorial("patcher")}
+                style={{
+                  borderRadius: 999,
+                  padding: "6px 14px",
+                  border: "1px solid #4b5563",
+                  background: "#020617",
+                  color: "#e5e7eb",
+                  cursor: "pointer",
+                  fontSize: 13,
+                }}
+              >
+                See example as Patcher
+              </button>
+            </div>
+          )}
+
+          <div style={{ marginLeft: "auto" }}>
+            <button
+              onClick={onClose}
+              style={{
+                borderRadius: 999,
+                padding: "6px 14px",
+                border: "1px solid #4b5563",
+                background: "#020617",
+                color: "#e5e7eb",
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+            >
+              Got it — Let’s play
+            </button>
+          </div>
         </div>
       </div>
     </div>
