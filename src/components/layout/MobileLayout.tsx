@@ -1,32 +1,37 @@
-// src/components/layout/MobileLayout.tsx
+// src/layout/MobileLayout.tsx
 import React from "react";
 
-type MobileLayoutProps = {
+type LayoutProps = {
   children: React.ReactNode;
 };
 
-export const MobileLayout: React.FC<MobileLayoutProps> = ({ children }) => {
+export const MobileLayout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div
       style={{
-        // Keep everything within a comfortable phone width
+        minHeight: "100vh",
         width: "100%",
-        maxWidth: 520,               // good for big phones but not “tablet”
-        margin: "0 auto",
+        background: "#020617",
+        color: "#e5e7eb",
+        padding: "12px 10px",
         boxSizing: "border-box",
-
-        // Mobile-friendly padding
-        padding: "10px 10px 24px",
-
-        // Slight gap between stacked sections
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
       }}
     >
-      {children}
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 480,
+          margin: "0 auto",
+          borderRadius: 12,
+          border: "1px solid #111827",
+          background: "#020617",
+          boxShadow: "0 14px 32px rgba(0,0,0,0.7)",
+          padding: 10,
+          boxSizing: "border-box",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 };
-
-export default MobileLayout;

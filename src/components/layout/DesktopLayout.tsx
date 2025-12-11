@@ -1,30 +1,38 @@
-// src/components/layout/DesktopLayout.tsx
+// src/layout/DesktopLayout.tsx
 import React from "react";
 
-type DesktopLayoutProps = {
+type LayoutProps = {
   children: React.ReactNode;
 };
 
-export const DesktopLayout: React.FC<DesktopLayoutProps> = ({ children }) => {
+export const DesktopLayout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div
       style={{
-        // Centers the whole app content on large screens
-        width: "100%",
-        maxWidth: 1200,
-        margin: "0 auto",
-        boxSizing: "border-box",
-
-        // Give desktop a bit more structure / spacing
+        minHeight: "100vh",
         display: "flex",
-        flexDirection: "column",
-        gap: 16,
-        paddingBottom: 24,
+        justifyContent: "center",
+        alignItems: "stretch",
+        background: "#0f172a", // slate-900
+        color: "#e5e7eb",
+        padding: "24px 32px",
+        boxSizing: "border-box",
       }}
     >
-      {children}
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 1200,
+          borderRadius: 16,
+          border: "1px solid #1f2937",
+          background: "radial-gradient(circle at top, #020617, #020617 40%, #020617)",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.75)",
+          padding: 16,
+          boxSizing: "border-box",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 };
-
-export default DesktopLayout;
