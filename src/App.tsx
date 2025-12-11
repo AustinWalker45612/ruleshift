@@ -22,6 +22,41 @@ import { OnboardingOverlay } from "./components/OnboardingOverlay";
 import type { TutorialRole } from "./components/TutorialOverlay";
 import { TutorialOverlay } from "./components/TutorialOverlay";
 
+import { DesktopLayout } from "./components/layout/DesktopLayout";
+import { TabletLayout } from "./components/layout/TabletLayout";
+import { MobileLayout } from "./components/layout/MobileLayout";
+
+// ---------- Device type detection ----------
+
+type DeviceType = "mobile" | "tablet" | "desktop";
+
+const useDeviceType = (): DeviceType => {
+  const [deviceType, setDeviceType] = useState<DeviceType>("desktop");
+
+  useEffect(() => {
+    const update = () => {
+      if (typeof window === "undefined") return;
+      const width = window.innerWidth;
+
+      if (width < 640) {
+        setDeviceType("mobile");
+      } else if (width < 1024) {
+        setDeviceType("tablet");
+      } else {
+        setDeviceType("desktop");
+      }
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  return deviceType;
+};
+
+// ---------- Types for game state ----------
+
 type Player = {
   name: string;
   ready: boolean;
@@ -51,19 +86,14 @@ type Round = {
   guesses: Guess[];
 };
 
-// Rule template snapshot shown to the Breaker for this patch round
 type TemplateOptionSummary = {
   value: RuleTemplate;
   label: string;
 };
 
-// Which seat this browser is playing as (or none yet)
 // 0 → Player 1, 1 → Player 2, null → spectator / not assigned
 type PlayerSeat = 0 | 1 | null;
 
-/**
- * Presence payload coming from the server.
- */
 type SeatPresence = {
   seatIndex: number;
   occupied: boolean;
@@ -77,10 +107,6 @@ type RoomPresence = {
   spectatorsCount: number;
 };
 
-/**
- * Everything that BOTH devices should stay in sync on.
- * (Per-device-only things like breakerError, etc. stay local.)
- */
 type SyncedState = {
   roomId?: string;
 
@@ -107,27 +133,25 @@ type SyncedState = {
   lastBreakerPoints: number | null;
   lastPatcherPoints: number | null;
 
-  // which templates were available when the last patch was made
   templatesAvailableForCurrentRound: TemplateOptionSummary[];
 
   sender?: string;
 };
 
-// Tutorial mode for the local client-only examples
+// Tutorial mode for local-only examples
 type TutorialMode = TutorialRole | "none";
 
-// Helper: parse initial room from URL like /room/ABCD
+// Helper: read /room/ABCD
 const getInitialRoomFromUrl = (): string | null => {
   if (typeof window === "undefined") return null;
   const path = window.location.pathname || "/";
-  const segments = path.split("/").filter(Boolean); // remove empty strings
+  const segments = path.split("/").filter(Boolean);
   if (segments.length >= 2 && segments[0].toLowerCase() === "room") {
     return segments[1].toUpperCase();
   }
   return null;
 };
 
-// Helper: generate a random room ID (5 chars, no confusing chars)
 const generateRoomId = (): string => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I/O/1/0
   let id = "";
@@ -138,7 +162,16 @@ const generateRoomId = (): string => {
 };
 
 const App: React.FC = () => {
-  // Room ID is either taken from the URL (/room/ABCD) or auto-generated
+  const deviceType = useDeviceType();
+
+  const LayoutWrapper =
+    deviceType === "mobile"
+      ? MobileLayout
+      : deviceType === "tablet"
+      ? TabletLayout
+      : DesktopLayout;
+
+  // Room ID is either taken from URL (/room/ABCD) or auto-generated
   const [roomId] = useState<string>(() => {
     const fromUrl = getInitialRoomFromUrl();
     if (fromUrl) return fromUrl;
@@ -146,13 +179,12 @@ const App: React.FC = () => {
     const newId = generateRoomId();
     if (typeof window !== "undefined") {
       const newUrl = `/room/${newId}`;
-      // Use replaceState so back button doesn't go to a "roomless" URL
       window.history.replaceState({}, "", newUrl);
     }
     return newId;
   });
 
-  // Persistent clientId per device (localStorage)
+  // Persistent clientId per device
   const [clientId] = useState<string>(() => {
     try {
       const key = "ruleshiftClientId";
@@ -171,12 +203,11 @@ const App: React.FC = () => {
       }
       return newId;
     } catch {
-      // Fallback if localStorage not available
       return Math.random().toString(36).slice(2);
     }
   });
 
-  // Which seat this browser is controlling: Player 1 (0) or Player 2 (1), or spectator (null)
+  // Which seat this browser is controlling
   const [playerSeat, setPlayerSeat] = useState<PlayerSeat>(null);
 
   // Room presence (connections, spectators)
@@ -220,7 +251,9 @@ const App: React.FC = () => {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [currentRoundGuesses, setCurrentRoundGuesses] = useState<Guess[]>([]);
 
-  // Per-player guess history across the duel (used in BreakerView)
+  // Per-player guess history
+  //the first 4, but your candidate code uses more characters.
+
   const [playerCorrectGuesses, setPlayerCorrectGuesses] = useState<string[][]>(
     [[], []]
   );
@@ -231,11 +264,11 @@ const App: React.FC = () => {
   const [rules, setRules] = useState<Rule[]>([]);
   const [nextRuleId, setNextRuleId] = useState(1);
 
-  // Template selection + parameters for the new rule
+  // Template selection + parameters
   const [selectedTemplate, setSelectedTemplate] =
     useState<RuleTemplate>("positionEquals");
 
-  const [positionIndex, setPositionIndex] = useState<number>(1); // 1–4 in UI
+  const [positionIndex, setPositionIndex] = useState<number>(1); // 1–4
   const [positionChar, setPositionChar] = useState<string>("");
 
   const [positionKind, setPositionKind] = useState<"letter" | "digit">(
@@ -258,11 +291,11 @@ const App: React.FC = () => {
 
   const [distinctCount, setDistinctCount] = useState<number>(4);
 
-  // For result screens
+  // Result screens
   const [lastResult, setLastResult] = useState<GuessResult | null>(null);
   const [lastGuessValue, setLastGuessValue] = useState<string | null>(null);
 
-  // Score state
+  // Scores
   const [playerScores, setPlayerScores] = useState<[number, number]>([0, 0]);
   const [lastBreakerPoints, setLastBreakerPoints] = useState<number | null>(
     null
@@ -271,30 +304,28 @@ const App: React.FC = () => {
     null
   );
 
-  // Endgame state (hard-enforced attempts)
+  // Endgame
   const [endgameModeActive, setEndgameModeActive] = useState(false);
   const [endgameAttemptsLeft, setEndgameAttemptsLeft] = useState(0);
   const [endgameBaseAttempts, setEndgameBaseAttempts] = useState(0);
   const [endgameBonusAttempts, setEndgameBonusAttempts] = useState(0);
 
-  // Previous valid-code count (before the latest rule that led into endgame)
   const [prevValidCodesCount, setPrevValidCodesCount] = useState<number | null>(
     null
   );
 
-  // templates that were available when the current patch was made
   const [templatesAvailableForCurrentRound, setTemplatesAvailableForCurrentRound] =
     useState<TemplateOptionSummary[]>([]);
 
-  // How to Play modal visibility (opened via button only now)
+  // How to play
   const [showHowToPlay, setShowHowToPlay] = useState(false);
 
-  // Onboarding overlay: show once per device
+  // Onboarding overlay (per-device)
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     try {
       const seen = window.localStorage.getItem("ruleshiftOnboardingSeen_v1");
-      return !seen; // show if not seen yet
+      return !seen;
     } catch {
       return true;
     }
@@ -307,11 +338,11 @@ const App: React.FC = () => {
         window.localStorage.setItem("ruleshiftOnboardingSeen_v1", "true");
       }
     } catch {
-      // ignore storage errors
+      // ignore
     }
   };
 
-  // Tutorial overlay mode (local-only examples)
+  // Tutorial overlay
   const [tutorialMode, setTutorialMode] = useState<TutorialMode>("none");
 
   const openTutorial = (role: TutorialRole = "breaker") => {
@@ -324,7 +355,7 @@ const App: React.FC = () => {
 
   const bothPlayersReady = players[0].ready && players[1].ready;
 
-  const TOTAL_CODES = 36 ** 4; // 1,679,616 possible 4-char codes
+  const TOTAL_CODES = 36 ** 4;
 
   // ---------- GLOBAL VALID-CODE SPACE + ENDGAME POTENTIAL ----------
   const allPossibleCodes = useMemo(() => {
@@ -374,7 +405,7 @@ const App: React.FC = () => {
     };
   }, [isEndgameWindow, prevValidCodesCount, currentValidCount]);
 
-  // When we have a roomId, join it on the server and get a seat assigned
+  // ---------- SOCKET: JOIN ROOM ----------
   useEffect(() => {
     if (!roomId) return;
 
@@ -414,12 +445,9 @@ const App: React.FC = () => {
     };
   }, [roomId]);
 
-  // ---------- SOCKET BROADCAST HELPER ----------
+  // ---------- BROADCAST STATE ----------
   const broadcastState = (overrides: Partial<SyncedState> = {}) => {
-    if (!roomId) {
-      // Shouldn't happen now, but guard is harmless
-      return;
-    }
+    if (!roomId) return;
 
     const payload: SyncedState = {
       roomId,
@@ -449,16 +477,11 @@ const App: React.FC = () => {
     socket.emit("game:state", payload);
   };
 
-  // ---------- SOCKET RECEIVE: APPLY REMOTE STATE ----------
+  // ---------- RECEIVE REMOTE STATE ----------
   useEffect(() => {
     const handler = (remote: SyncedState) => {
-      // Ignore our own echo
       if (remote.sender && remote.sender === socket.id) return;
-
-      // If we have a roomId, ignore states for other rooms
-      if (roomId && remote.roomId && remote.roomId !== roomId) {
-        return;
-      }
+      if (roomId && remote.roomId && remote.roomId !== roomId) return;
 
       setPlayers(remote.players);
       setPhase(remote.phase);
@@ -494,7 +517,7 @@ const App: React.FC = () => {
     };
   }, [roomId]);
 
-  // ---------- ON CONNECT / RECONNECT: REQUEST LATEST STATE ----------
+  // ---------- ON CONNECT / RECONNECT: REQUEST STATE ----------
   useEffect(() => {
     if (!roomId) return;
 
@@ -517,7 +540,7 @@ const App: React.FC = () => {
     };
   }, [roomId]);
 
-  // ---------- LOCAL EFFECTS (NOT EMITTING) ----------
+  // ---------- LOCAL EFFECTS ----------
   useEffect(() => {
     if (phase === "patcherSetup") {
       setPrevValidCodesCount(currentValidCount);
@@ -540,8 +563,7 @@ const App: React.FC = () => {
     }
   }, [phase, isEndgameWindow, endgameStats]);
 
-  // Visible rules in the UI:
-  // During breakerTurn we hide ONLY the newest rule.
+  // Visible rules in the UI
   const visibleRules =
     phase === "breakerTurn"
       ? rules.slice(0, Math.max(0, rules.length - 1))
@@ -630,7 +652,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // Snapshot of the templates the Patcher COULD choose right now
     const templatesAtPatchTime = getAvailableTemplateOptions(rules);
 
     let newRule: Rule;
@@ -919,9 +940,7 @@ const App: React.FC = () => {
     setNextRuleId((prev) => prev + 1);
     setPatcherRuleError(null);
 
-    // Store & sync the snapshot of templates that were available this patch
     setTemplatesAvailableForCurrentRound(templatesAtPatchTime);
-
     setPhase("breakerTurn");
 
     broadcastState({
@@ -964,17 +983,17 @@ const App: React.FC = () => {
       return;
     }
 
-    // Check against only the rules the Breaker can see (previously implemented)
+    // Check against only the rules visible to Breaker
     const passesVisibleRules = passesAllRules(guess, visibleRules);
 
     if (!passesVisibleRules) {
       setBreakerError("Breaks one of the previously implemented rules.");
-      return; // do NOT count it as an INVALID attempt, don't record guess
+      return; // do NOT count as INVALID attempt
     }
 
     const systemValid = passesAllRules(guess, rules);
 
-    // INVALID path
+    // INVALID
     if (!systemValid) {
       const newGuess: Guess = {
         value: guess,
@@ -1044,7 +1063,6 @@ const App: React.FC = () => {
             `❌ Invalid: this guess breaks at least one active rule. Endgame attempts left: ${newAttempts}.`
           );
 
-          // broadcast updated attempts so spectator sees countdown
           broadcastState({
             endgameAttemptsLeft: newAttempts,
           });
@@ -1180,7 +1198,6 @@ const App: React.FC = () => {
     setPrevValidCodesCount(null);
     setPhase("patcherSetup");
 
-    // Clear code/rule across devices too
     broadcastState({
       phase: "patcherSetup",
       currentPatcherIndex: nextPatcherIndex,
@@ -1248,18 +1265,15 @@ const App: React.FC = () => {
   const thisPlayerIndex = playerSeat ?? 0;
   const thisPlayer = players[thisPlayerIndex];
 
-  // Is this browser currently the patcher or breaker?
   const isPatcherHere = !isSpectator && playerSeat === currentPatcherIndex;
   const isBreakerHere = !isSpectator && playerSeat === currentBreakerIndex;
 
-  // Presence helpers
   const seat0 = roomPresence?.seats?.find((s) => s.seatIndex === 0);
   const seat1 = roomPresence?.seats?.find((s) => s.seatIndex === 1);
   const seat0Connected = !!seat0?.connected;
   const seat1Connected = !!seat1?.connected;
   const spectatorsCount = roomPresence?.spectatorsCount ?? 0;
 
-  // --- name confirm handler for this browser's seat ---
   const handleConfirmName = () => {
     if (isSpectator || playerSeat === null) return;
     const index = playerSeat;
@@ -1274,13 +1288,10 @@ const App: React.FC = () => {
     };
 
     setPlayers(updatedPlayers);
-
-    // Broadcast new player names / ready state to the room
     broadcastState({
       players: updatedPlayers,
     });
 
-    // Also persist this player to the backend DB
     console.log("🔔 Emitting player:upsert", { clientId, rawName });
     socket.emit("player:upsert", {
       clientId,
@@ -1298,722 +1309,739 @@ const App: React.FC = () => {
     });
   };
 
-  // From here, we always have a roomId. Seat is assigned by the server.
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        overflowY: "auto",
-        padding: "16px clamp(8px, 4vw, 32px)",
-        boxSizing: "border-box",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-        background: "#0f172a",
-        color: "#e5e7eb",
-      }}
-    >
-      {/* Onboarding overlay (first-time players, per device) */}
-      <OnboardingOverlay
-        isOpen={showOnboarding}
-        onClose={handleCloseOnboarding}
-        onOpenTutorial={openTutorial}
-      />
-
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "1120px",
-          margin: "0 auto",
-        }}
-      >
-        {/* HEADER WITH TITLE + ROOM + HOW-TO BUTTON */}
-        <header
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 12,
-            marginBottom: 12,
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ flex: "1 1 260px" }}>
-            <h1
-              style={{
-                marginBottom: 4,
-                fontSize: "clamp(30px, 4.2vw, 44px)",
-              }}
-            >
-              RuleShift
-            </h1>
-
-            <p
-              style={{
-                marginBottom: 4,
-                fontSize: 12,
-                opacity: 0.75,
-              }}
-            >
-              Room: <strong>{roomId}</strong>{" "}
-              <span style={{ opacity: 0.7 }}>
-                •{" "}
-                {isSpectator
-                  ? "You are watching as a spectator"
-                  : `You are Player ${thisPlayerIndex + 1}`}
-              </span>
-            </p>
-
-            {roomPresence && (
-              <p
-                style={{
-                  marginBottom: 4,
-                  fontSize: 11,
-                  opacity: 0.8,
-                }}
-              >
-                Connections — P1:{" "}
-                <span
-                  style={{ color: seat0Connected ? "#4ade80" : "#f97373" }}
-                >
-                  {seat0Connected ? "online" : "offline"}
-                </span>{" "}
-                · P2:{" "}
-                <span
-                  style={{ color: seat1Connected ? "#4ade80" : "#f97373" }}
-                >
-                  {seat1Connected ? "online" : "offline"}
-                </span>{" "}
-                · Spectators: {spectatorsCount}
-              </p>
-            )}
-
-            {!roomPresence && (
-              <p
-                style={{
-                  marginBottom: 4,
-                  fontSize: 11,
-                  opacity: 0.6,
-                }}
-              >
-                Connecting players…
-              </p>
-            )}
-
-            <p
-              style={{
-                marginTop: 4,
-                marginBottom: 0,
-                fontSize: "clamp(13px, 1.5vw, 15px)",
-              }}
-            >
-              Two players. One evolving rule system. Patcher vs Breaker in a
-              duel.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              alignItems: "flex-end",
-              flexShrink: 0,
-            }}
-          >
-            <button
-              onClick={handleCopyRoomLink}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "6px 12px",
-                borderRadius: 999,
-                border: "1px solid #4b5563",
-                background: "#020617",
-                color: "#e5e7eb",
-                fontSize: 11,
-                cursor: "pointer",
-              }}
-            >
-              <span>Copy room link</span>
-              {copyStatus === "copied" && (
-                <span style={{ fontSize: 11, color: "#4ade80" }}>✓ Copied</span>
-              )}
-              {copyStatus === "error" && (
-                <span style={{ fontSize: 11, color: "#f97373" }}>Error</span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setShowHowToPlay(true)}
-              style={{
-                borderRadius: 999,
-                padding: "6px 12px",
-                border: "1px solid #4b5563",
-                background: "#020617",
-                color: "#e5e7eb",
-                cursor: "pointer",
-                fontSize: 13,
-                whiteSpace: "nowrap",
-              }}
-            >
-              ❓ How to play
-            </button>
-
-            <button
-              onClick={() => openTutorial("breaker")}
-              style={{
-                borderRadius: 999,
-                padding: "6px 12px",
-                border: "1px solid #4b5563",
-                background: "#020617",
-                color: "#e5e7eb",
-                cursor: "pointer",
-                fontSize: 12,
-                whiteSpace: "nowrap",
-              }}
-            >
-              🧠 Examples (Breaker / Patcher)
-            </button>
-          </div>
-        </header>
-
-        {/* === ENTER NAMES === */}
-        {phase === "enterNames" && (
-          <>
-            {!isSpectator ? (
-              // Player devices: enter own name
-              <div
-                style={{
-                  background: "#111827",
-                  padding: 20,
-                  borderRadius: 14,
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
-                  maxWidth: 560,
-                  margin: "0 auto",
-                }}
-              >
-                <h2
-                  style={{
-                    marginBottom: 8,
-                    fontSize: "clamp(18px,2.3vw,22px)",
-                  }}
-                >
-                  {thisPlayerIndex === 0
-                    ? "Player 1, enter your name"
-                    : "Player 2, enter your name"}
-                </h2>
-                <p
-                  style={{
-                    marginBottom: 12,
-                    fontSize: 12,
-                    opacity: 0.7,
-                  }}
-                >
-                  This screen is for{" "}
-                  <strong>
-                    Player {thisPlayerIndex + 1}
-                    {thisPlayer.name ? ` (${thisPlayer.name})` : ""}
-                  </strong>
-                  . Each player only sets and confirms their own name.
-                </p>
-
-                <label style={{ display: "block", marginBottom: 12 }}>
-                  Your name:
-                  <input
-                    style={{
-                      width: "100%",
-                      boxSizing: "border-box",
-                      marginTop: 4,
-                      padding: 10,
-                      borderRadius: 8,
-                      border: "1px solid #374151",
-                      background: "#020617",
-                      color: "#e5e7eb",
-                      fontSize: 14,
-                    }}
-                    value={thisPlayer.name}
-                    onChange={(e) => handleNameChange(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleConfirmName();
-                      }
-                    }}
-                    placeholder="Type your name"
-                  />
-                </label>
-
-                <button
-                  onClick={handleConfirmName}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "10px 16px",
-                    borderRadius: 999,
-                    border: "1px solid #4b5563",
-                    fontWeight: 500,
-                    cursor: thisPlayer.name.trim() ? "pointer" : "not-allowed",
-                    background: thisPlayer.ready ? "#16a34a" : "#111827",
-                    color: thisPlayer.ready ? "#ecfdf5" : "#e5e7eb",
-                    marginBottom: 12,
-                    fontSize: 14,
-                  }}
-                  disabled={!thisPlayer.name.trim()}
-                >
-                  {thisPlayer.ready ? "Name confirmed ✓" : "Confirm name"}
-                </button>
-
-                {/* Show status of both players */}
-                <div
-                  style={{
-                    background: "#020617",
-                    borderRadius: 8,
-                    padding: 8,
-                    border: "1px solid #1f2937",
-                    fontSize: 12,
-                    marginBottom: 12,
-                  }}
-                >
-                  <div>
-                    Player 1:{" "}
-                    <strong>
-                      {players[0].name || "(not set yet)"}{" "}
-                      {players[0].ready ? "✓" : ""}
-                    </strong>{" "}
-                    <span
-                      style={{
-                        fontSize: 11,
-                        opacity: 0.8,
-                        marginLeft: 4,
-                        color: seat0Connected ? "#4ade80" : "#f97373",
-                      }}
-                    >
-                      {seat0Connected ? "online" : "offline"}
-                    </span>
-                  </div>
-                  <div>
-                    Player 2:{" "}
-                    <strong>
-                      {players[1].name || "(not set yet)"}{" "}
-                      {players[1].ready ? "✓" : ""}
-                    </strong>{" "}
-                    <span
-                      style={{
-                        fontSize: 11,
-                        opacity: 0.8,
-                        marginLeft: 4,
-                        color: seat1Connected ? "#4ade80" : "#f97373",
-                      }}
-                    >
-                      {seat1Connected ? "online" : "offline"}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={startGame}
-                  disabled={!bothPlayersReady}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "11px 16px",
-                    borderRadius: 999,
-                    border: "none",
-                    fontWeight: 600,
-                    cursor: bothPlayersReady ? "pointer" : "not-allowed",
-                    background: bothPlayersReady ? "#2563eb" : "#1f2937",
-                    color: "#e5e7eb",
-                    fontSize: 15,
-                  }}
-                >
-                  {bothPlayersReady
-                    ? "Start Duel"
-                    : "Waiting for both players to confirm names"}
-                </button>
-              </div>
-            ) : (
-              // Spectator: read-only view of name status
-              <div
-                style={{
-                  background: "#111827",
-                  padding: 20,
-                  borderRadius: 14,
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
-                  maxWidth: 560,
-                  margin: "0 auto",
-                }}
-              >
-                <h2
-                  style={{
-                    marginBottom: 8,
-                    fontSize: "clamp(18px,2.3vw,22px)",
-                  }}
-                >
-                  Spectator Lobby
-                </h2>
-                <p
-                  style={{
-                    marginBottom: 12,
-                    fontSize: 12,
-                    opacity: 0.7,
-                  }}
-                >
-                  You&apos;re watching this duel as a spectator. Names are set
-                  from the player devices.
-                </p>
-
-                <div
-                  style={{
-                    background: "#020617",
-                    borderRadius: 8,
-                    padding: 8,
-                    border: "1px solid #1f2937",
-                    fontSize: 12,
-                    marginBottom: 8,
-                  }}
-                >
-                  <div>
-                    Player 1:{" "}
-                    <strong>
-                      {players[0].name || "(not set yet)"}{" "}
-                      {players[0].ready ? "✓" : ""}
-                    </strong>{" "}
-                    <span
-                      style={{
-                        fontSize: 11,
-                        opacity: 0.8,
-                        marginLeft: 4,
-                        color: seat0Connected ? "#4ade80" : "#f97373",
-                      }}
-                    >
-                      {seat0Connected ? "online" : "offline"}
-                    </span>
-                  </div>
-                  <div>
-                    Player 2:{" "}
-                    <strong>
-                      {players[1].name || "(not set yet)"}{" "}
-                      {players[1].ready ? "✓" : ""}
-                    </strong>{" "}
-                    <span
-                      style={{
-                        fontSize: 11,
-                        opacity: 0.8,
-                        marginLeft: 4,
-                        color: seat1Connected ? "#4ade80" : "#f97373",
-                      }}
-                    >
-                      {seat1Connected ? "online" : "offline"}
-                    </span>
-                  </div>
-                </div>
-
-                <p
-                  style={{
-                    fontSize: 12,
-                    opacity: 0.7,
-                    marginTop: 8,
-                  }}
-                >
-                  Once both players are ready and start the duel, you&apos;ll
-                  see the full game board.
-                </p>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* === EVERYTHING AFTER NAMES === */}
-        {phase !== "enterNames" && (
-          <>
-            {/* STATUS + SCORE — SHOWN ON ALL DEVICES */}
-            <div
-              style={{
-                marginBottom: 8,
-                padding: 12,
-                borderRadius: 12,
-                background: "#020617",
-                border: "1px solid #1f2937",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: 14,
-                  gap: 8,
-                  flexWrap: "wrap",
-                }}
-              >
-                <span>Round: {currentRoundNumber}</span>
-                <span>
-                  Patcher: <strong>{currentPatcherName}</strong> | Breaker:{" "}
-                  <strong>{currentBreakerName}</strong>
-                </span>
-              </div>
-              <div style={{ marginTop: 4, fontSize: 13 }}>
-                Score — {players[0].name || "Player 1"}:{" "}
-                {playerScores[0] ?? 0} | {players[1].name || "Player 2"}:{" "}
-                {playerScores[1] ?? 0}
-              </div>
-            </div>
-
-            {/* === PATCHER SETUP VIEW — CURRENT PATCHER'S MACHINE ONLY === */}
-            {phase === "patcherSetup" && isPatcherHere && (
-              <PatcherView
-                mode={"patcher"}
-                currentPatcherName={currentPatcherName}
-                patcherSecretCode={patcherSecretCode}
-                setPatcherSecretCode={setPatcherSecretCode}
-                selectedTemplate={selectedTemplate}
-                setSelectedTemplate={setSelectedTemplate}
-                positionIndex={positionIndex}
-                setPositionIndex={setPositionIndex}
-                positionChar={positionChar}
-                setPositionChar={setPositionChar}
-                positionKind={positionKind}
-                setPositionKind={setPositionKind}
-                lettersCount={lettersCount}
-                setLettersCount={setLettersCount}
-                digitsCount={digitsCount}
-                setDigitsCount={setDigitsCount}
-                firstChar={firstChar}
-                setFirstChar={setFirstChar}
-                secondChar={secondChar}
-                setSecondChar={setSecondChar}
-                mustContainChar={mustContainChar}
-                setMustContainChar={setMustContainChar}
-                forbiddenChar={forbiddenChar}
-                setForbiddenChar={setForbiddenChar}
-                maxDigitValue={maxDigitValue}
-                setMaxDigitValue={setMaxDigitValue}
-                cannotAdjCharA={cannotAdjCharA}
-                setCannotAdjCharA={setCannotAdjCharA}
-                cannotAdjCharB={cannotAdjCharB}
-                setCannotAdjCharB={setCannotAdjCharB}
-                distinctCount={distinctCount}
-                setDistinctCount={setDistinctCount}
-                availableTemplateOptions={availableTemplateOptions}
-                patcherRuleError={patcherRuleError}
-                handleConfirmPatcherSetup={handleConfirmPatcherSetup}
-                visibleRules={visibleRules}
-                validCodesCount={currentValidCount}
-              />
-            )}
-
-            {/* NON-PATCHER MACHINE DURING PATCHER SETUP */}
-            {phase === "patcherSetup" && !isPatcherHere && (
-              <div
-                style={{
-                  background: "#111827",
-                  padding: 20,
-                  borderRadius: 12,
-                  textAlign: "center",
-                  maxWidth: 520,
-                  margin: "0 auto",
-                  border: "1px solid #4b5563",
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: 15,
-                    marginBottom: 4,
-                    fontWeight: 600,
-                  }}
-                >
-                  Waiting for Patcher
-                </h3>
-                <p style={{ fontSize: 14 }}>
-                  Waiting for{" "}
-                  <strong>{currentPatcherName || "your opponent"}</strong> to
-                  set the secret code and add a new rule.
-                </p>
-              </div>
-            )}
-
-            {/* === BREAKER TURN VIEW — CURRENT BREAKER'S MACHINE ONLY === */}
-            {phase === "breakerTurn" && isBreakerHere && (
-              <BreakerView
-                mode="phone"
-                currentBreaker={currentBreaker}
-                breakerGuess={breakerGuess}
-                setBreakerGuess={setBreakerGuess}
-                breakerError={breakerError}
-                handleAddGuess={handleAddGuess}
-                currentRoundGuesses={currentRoundGuesses}
-                playerCorrectGuesses={playerCorrectGuesses}
-                playerIncorrectGuesses={playerIncorrectGuesses}
-                currentBreakerIndex={currentBreakerIndex}
-                endgameModeActive={endgameModeActive}
-                isEndgameWindow={isEndgameWindow}
-                endgameBaseAttempts={endgameBaseAttempts}
-                endgameBonusAttempts={endgameBonusAttempts}
-                endgameAttemptsLeft={endgameAttemptsLeft}
-                validCodes={validCodes}
-                visibleRules={visibleRules}
-                validCodesCount={currentValidCount}
-                availableTemplatesForThisPatchRound={
-                  templatesAvailableForCurrentRound
-                }
-              />
-            )}
-
-            {/* NON-BREAKER MACHINE DURING BREAKER TURN */}
-            {phase === "breakerTurn" && !isBreakerHere && (
-              <>
-                {endgameModeActive && isEndgameWindow ? (
-                  // Endgame spectator view: read-only BreakerView
-                  <BreakerView
-                    mode="phone"
-                    readOnly
-                    currentBreaker={currentBreaker}
-                    breakerGuess={""}
-                    setBreakerGuess={() => {}}
-                    breakerError={null}
-                    handleAddGuess={() => {}}
-                    currentRoundGuesses={currentRoundGuesses}
-                    playerCorrectGuesses={playerCorrectGuesses}
-                    playerIncorrectGuesses={playerIncorrectGuesses}
-                    currentBreakerIndex={currentBreakerIndex}
-                    endgameModeActive={endgameModeActive}
-                    isEndgameWindow={isEndgameWindow}
-                    endgameBaseAttempts={endgameBaseAttempts}
-                    endgameBonusAttempts={endgameBonusAttempts}
-                    endgameAttemptsLeft={endgameAttemptsLeft}
-                    validCodes={validCodes}
-                    visibleRules={visibleRules}
-                    validCodesCount={currentValidCount}
-                    availableTemplatesForThisPatchRound={
-                      templatesAvailableForCurrentRound
-                    }
-                  />
-                ) : (
-                  <div
-                    style={{
-                      background: "#111827",
-                      padding: 20,
-                      borderRadius: 12,
-                      textAlign: "center",
-                      maxWidth: 520,
-                      margin: "0 auto",
-                      border: "1px solid #4b5563",
-                    }}
-                  >
-                    <h3
-                      style={{
-                        fontSize: 15,
-                        marginBottom: 4,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Waiting for Breaker
-                    </h3>
-                    <p style={{ fontSize: 14 }}>
-                      <strong>{currentBreakerName || "Your opponent"}</strong>{" "}
-                      is currently trying to break the system.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* === RESULT SCREENS — SHOWN ON ALL DEVICES === */}
-            {(phase === "validResult" ||
-              phase === "exactResult" ||
-              phase === "breakerWin" ||
-              phase === "patcherWin") && (
-              <ResultScreens
-                phase={phase}
-                lastGuessValue={lastGuessValue}
-                lastResult={lastResult}
-                patcherSecretCode={patcherSecretCode}
-                currentBreakerName={currentBreakerName}
-                currentPatcherName={currentPatcherName}
-                onNextRound={advanceToNextRound}
-                onRestartDuel={handleRestartDuel}
-                lastBreakerPoints={lastBreakerPoints}
-                lastPatcherPoints={lastPatcherPoints}
-              />
-            )}
-
-            {/* === DUEL HISTORY — SHOWN ON ALL DEVICES === */}
-            <div
-              style={{
-                background: "#020617",
-                padding: 12,
-                borderRadius: 12,
-                border: "1px solid #1f2937",
-                fontSize: 12,
-                marginTop: 16,
-              }}
-            >
-              <h3 style={{ marginBottom: 8, fontSize: 13 }}>Duel History</h3>
-
-              {rounds.length === 0 || rounds.length === 1 ? (
-                <p style={{ opacity: 0.6, fontSize: 12 }}>
-                  Once you get further into the duel, completed rounds will
-                  appear here.
-                </p>
-              ) : (
-                rounds.map((r) => (
-                  <div
-                    key={r.roundNumber}
-                    style={{
-                      marginBottom: 10,
-                      paddingBottom: 8,
-                      borderBottom: "1px solid #111827",
-                    }}
-                  >
-                    <div style={{ marginBottom: 2 }}>
-                      <strong>Round {r.roundNumber}</strong> — Patcher:{" "}
-                      {players[r.patcherIndex].name}
-                    </div>
-                    <div>Code: {r.secretCode}</div>
-                    <div style={{ opacity: 0.8 }}>Rule: {r.ruleText}</div>
-                  </div>
-                ))
-              )}
-
-              {/* Restart button stays the same */}
-              <button
-                onClick={handleRestartDuel}
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "8px 16px",
-                  borderRadius: 999,
-                  border: "1px solid #4b5563",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  background: "transparent",
-                  color: "#9ca3af",
-                  marginTop: 8,
-                }}
-              >
-                Restart Duel
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* HOW TO PLAY MODAL – AVAILABLE ON ALL PHASES */}
-        <HowToPlayModal
-          isOpen={showHowToPlay}
-          onClose={() => setShowHowToPlay(false)}
-          currentPatcherName={currentPatcherName}
-          currentBreakerName={currentBreakerName}
+    <LayoutWrapper>
+      <div>
+        {/* Onboarding overlay */}
+        <OnboardingOverlay
+          isOpen={showOnboarding}
+          onClose={handleCloseOnboarding}
           onOpenTutorial={openTutorial}
         />
 
-        {/* TUTORIAL OVERLAY — LOCAL EXAMPLES FOR BREAKER/PATCHER */}
-        <TutorialOverlay
-          isOpen={tutorialMode !== "none"}
-          initialRole={tutorialMode === "none" ? "breaker" : tutorialMode}
-          onClose={() => setTutorialMode("none")}
-        />
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 1120,
+            margin: "0 auto",
+          }}
+        >
+          {/* HEADER */}
+          <header
+            style={{
+              display: "flex",
+              flexDirection: deviceType === "mobile" ? "column" : "row",
+              justifyContent:
+                deviceType === "mobile" ? "flex-start" : "space-between",
+              alignItems: "flex-start",
+              gap: deviceType === "mobile" ? 8 : 12,
+              marginBottom: deviceType === "mobile" ? 10 : 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ flex: "1 1 260px" }}>
+              <h1
+                style={{
+                  marginBottom: 4,
+                  fontSize:
+                    deviceType === "mobile"
+                      ? "28px"
+                      : "clamp(30px, 4.2vw, 44px)",
+                }}
+              >
+                RuleShift
+              </h1>
+
+              <p
+                style={{
+                  marginBottom: 4,
+                  fontSize: deviceType === "mobile" ? 11 : 12,
+                  opacity: 0.75,
+                }}
+              >
+                Room: <strong>{roomId}</strong>{" "}
+                <span style={{ opacity: 0.7 }}>
+                  •{" "}
+                  {isSpectator
+                    ? "You are watching as a spectator"
+                    : `You are Player ${thisPlayerIndex + 1}`}
+                </span>
+              </p>
+
+              {roomPresence && (
+                <p
+                  style={{
+                    marginBottom: 4,
+                    fontSize: deviceType === "mobile" ? 10 : 11,
+                    opacity: 0.8,
+                  }}
+                >
+                  Connections — P1:{" "}
+                  <span
+                    style={{ color: seat0Connected ? "#4ade80" : "#f97373" }}
+                  >
+                    {seat0Connected ? "online" : "offline"}
+                  </span>{" "}
+                  · P2:{" "}
+                  <span
+                    style={{ color: seat1Connected ? "#4ade80" : "#f97373" }}
+                  >
+                    {seat1Connected ? "online" : "offline"}
+                  </span>{" "}
+                  · Spectators: {spectatorsCount}
+                </p>
+              )}
+
+              {!roomPresence && (
+                <p
+                  style={{
+                    marginBottom: 4,
+                    fontSize: deviceType === "mobile" ? 10 : 11,
+                    opacity: 0.6,
+                  }}
+                >
+                  Connecting players…
+                </p>
+              )}
+
+              <p
+                style={{
+                  marginTop: 4,
+                  marginBottom: 0,
+                  fontSize:
+                    deviceType === "mobile"
+                      ? 12
+                      : "clamp(13px, 1.5vw, 15px)",
+                }}
+              >
+                Two players. One evolving rule system. Patcher vs Breaker in a
+                duel.
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: deviceType === "mobile" ? "row" : "column",
+                flexWrap: deviceType === "mobile" ? "wrap" : "nowrap",
+                gap: 8,
+                alignItems:
+                  deviceType === "mobile" ? "flex-start" : "flex-end",
+                justifyContent:
+                  deviceType === "mobile" ? "flex-start" : "flex-end",
+                flexShrink: 0,
+              }}
+            >
+              <button
+                onClick={handleCopyRoomLink}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding:
+                    deviceType === "mobile" ? "5px 10px" : "6px 12px",
+                  borderRadius: 999,
+                  border: "1px solid #4b5563",
+                  background: "#020617",
+                  color: "#e5e7eb",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span>Copy room link</span>
+                {copyStatus === "copied" && (
+                  <span style={{ fontSize: 11, color: "#4ade80" }}>
+                    ✓ Copied
+                  </span>
+                )}
+                {copyStatus === "error" && (
+                  <span style={{ fontSize: 11, color: "#f97373" }}>Error</span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setShowHowToPlay(true)}
+                style={{
+                  borderRadius: 999,
+                  padding:
+                    deviceType === "mobile" ? "5px 10px" : "6px 12px",
+                  border: "1px solid #4b5563",
+                  background: "#020617",
+                  color: "#e5e7eb",
+                  cursor: "pointer",
+                  fontSize: deviceType === "mobile" ? 12 : 13,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ❓ How to play
+              </button>
+
+              <button
+                onClick={() => openTutorial("breaker")}
+                style={{
+                  borderRadius: 999,
+                  padding:
+                    deviceType === "mobile" ? "5px 10px" : "6px 12px",
+                  border: "1px solid #4b5563",
+                  background: "#020617",
+                  color: "#e5e7eb",
+                  cursor: "pointer",
+                  fontSize: deviceType === "mobile" ? 11 : 12,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                🧠 Examples (Breaker / Patcher)
+              </button>
+            </div>
+          </header>
+
+          {/* === ENTER NAMES === */}
+          {phase === "enterNames" && (
+            <>
+              {!isSpectator ? (
+                <div
+                  style={{
+                    background: "#111827",
+                    padding: deviceType === "mobile" ? 14 : 20,
+                    borderRadius: 12,
+                    boxShadow:
+                      deviceType === "mobile"
+                        ? "0 6px 16px rgba(0,0,0,0.45)"
+                        : "0 10px 25px rgba(0,0,0,0.4)",
+                    maxWidth: deviceType === "mobile" ? 480 : 560,
+                    margin: "0 auto",
+                  }}
+                >
+                  <h2
+                    style={{
+                      marginBottom: 8,
+                      fontSize:
+                        deviceType === "mobile"
+                          ? 18
+                          : "clamp(18px,2.3vw,22px)",
+                    }}
+                  >
+                    {thisPlayerIndex === 0
+                      ? "Player 1, enter your name"
+                      : "Player 2, enter your name"}
+                  </h2>
+                  <p
+                    style={{
+                      marginBottom: 12,
+                      fontSize: deviceType === "mobile" ? 11 : 12,
+                      opacity: 0.7,
+                    }}
+                  >
+                    This screen is for{" "}
+                    <strong>
+                      Player {thisPlayerIndex + 1}
+                      {thisPlayer.name ? ` (${thisPlayer.name})` : ""}
+                    </strong>
+                    . Each player only sets and confirms their own name.
+                  </p>
+
+                  <label style={{ display: "block", marginBottom: 12 }}>
+                    Your name:
+                    <input
+                      style={{
+                        width: "100%",
+                        boxSizing: "border-box",
+                        marginTop: 4,
+                        padding: deviceType === "mobile" ? 8 : 10,
+                        borderRadius: 8,
+                        border: "1px solid #374151",
+                        background: "#020617",
+                        color: "#e5e7eb",
+                        fontSize: deviceType === "mobile" ? 13 : 14,
+                      }}
+                      value={thisPlayer.name}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleConfirmName();
+                        }
+                      }}
+                      placeholder="Type your name"
+                    />
+                  </label>
+
+                  <button
+                    onClick={handleConfirmName}
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding:
+                        deviceType === "mobile" ? "9px 14px" : "10px 16px",
+                      borderRadius: 999,
+                      border: "1px solid #4b5563",
+                      fontWeight: 500,
+                      cursor: thisPlayer.name.trim()
+                        ? "pointer"
+                        : "not-allowed",
+                      background: thisPlayer.ready ? "#16a34a" : "#111827",
+                      color: thisPlayer.ready ? "#ecfdf5" : "#e5e7eb",
+                      marginBottom: 12,
+                      fontSize: deviceType === "mobile" ? 13 : 14,
+                    }}
+                    disabled={!thisPlayer.name.trim()}
+                  >
+                    {thisPlayer.ready ? "Name confirmed ✓" : "Confirm name"}
+                  </button>
+
+                  <div
+                    style={{
+                      background: "#020617",
+                      borderRadius: 8,
+                      padding: 8,
+                      border: "1px solid #1f2937",
+                      fontSize: deviceType === "mobile" ? 11 : 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <div>
+                      Player 1:{" "}
+                      <strong>
+                        {players[0].name || "(not set yet)"}{" "}
+                        {players[0].ready ? "✓" : ""}
+                      </strong>{" "}
+                      <span
+                        style={{
+                          fontSize: 11,
+                          opacity: 0.8,
+                          marginLeft: 4,
+                          color: seat0Connected ? "#4ade80" : "#f97373",
+                        }}
+                      >
+                        {seat0Connected ? "online" : "offline"}
+                      </span>
+                    </div>
+                    <div>
+                      Player 2:{" "}
+                      <strong>
+                        {players[1].name || "(not set yet)"}{" "}
+                        {players[1].ready ? "✓" : ""}
+                      </strong>{" "}
+                      <span
+                        style={{
+                          fontSize: 11,
+                          opacity: 0.8,
+                          marginLeft: 4,
+                          color: seat1Connected ? "#4ade80" : "#f97373",
+                        }}
+                      >
+                        {seat1Connected ? "online" : "offline"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={startGame}
+                    disabled={!bothPlayersReady}
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding:
+                        deviceType === "mobile" ? "10px 14px" : "11px 16px",
+                      borderRadius: 999,
+                      border: "none",
+                      fontWeight: 600,
+                      cursor: bothPlayersReady ? "pointer" : "not-allowed",
+                      background: bothPlayersReady ? "#2563eb" : "#1f2937",
+                      color: "#e5e7eb",
+                      fontSize: deviceType === "mobile" ? 14 : 15,
+                    }}
+                  >
+                    {bothPlayersReady
+                      ? "Start Duel"
+                      : "Waiting for both players to confirm names"}
+                  </button>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    background: "#111827",
+                    padding: deviceType === "mobile" ? 14 : 20,
+                    borderRadius: 12,
+                    boxShadow:
+                      deviceType === "mobile"
+                        ? "0 6px 16px rgba(0,0,0,0.45)"
+                        : "0 10px 25px rgba(0,0,0,0.4)",
+                    maxWidth: deviceType === "mobile" ? 480 : 560,
+                    margin: "0 auto",
+                  }}
+                >
+                  <h2
+                    style={{
+                      marginBottom: 8,
+                      fontSize:
+                        deviceType === "mobile"
+                          ? 18
+                          : "clamp(18px,2.3vw,22px)",
+                    }}
+                  >
+                    Spectator Lobby
+                  </h2>
+                  <p
+                    style={{
+                      marginBottom: 12,
+                      fontSize: deviceType === "mobile" ? 11 : 12,
+                      opacity: 0.7,
+                    }}
+                  >
+                    You&apos;re watching this duel as a spectator. Names are set
+                    from the player devices.
+                  </p>
+
+                  <div
+                    style={{
+                      background: "#020617",
+                      borderRadius: 8,
+                      padding: 8,
+                      border: "1px solid #1f2937",
+                      fontSize: deviceType === "mobile" ? 11 : 12,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div>
+                      Player 1:{" "}
+                      <strong>
+                        {players[0].name || "(not set yet)"}{" "}
+                        {players[0].ready ? "✓" : ""}
+                      </strong>{" "}
+                      <span
+                        style={{
+                          fontSize: 11,
+                          opacity: 0.8,
+                          marginLeft: 4,
+                          color: seat0Connected ? "#4ade80" : "#f97373",
+                        }}
+                      >
+                        {seat0Connected ? "online" : "offline"}
+                      </span>
+                    </div>
+                    <div>
+                      Player 2:{" "}
+                      <strong>
+                        {players[1].name || "(not set yet)"}{" "}
+                        {players[1].ready ? "✓" : ""}
+                      </strong>{" "}
+                      <span
+                        style={{
+                          fontSize: 11,
+                          opacity: 0.8,
+                          marginLeft: 4,
+                          color: seat1Connected ? "#4ade80" : "#f97373",
+                        }}
+                      >
+                        {seat1Connected ? "online" : "offline"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p
+                    style={{
+                      fontSize: deviceType === "mobile" ? 11 : 12,
+                      opacity: 0.7,
+                      marginTop: 8,
+                    }}
+                  >
+                    Once both players are ready and start the duel, you&apos;ll
+                    see the full game board.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* === AFTER NAMES === */}
+          {phase !== "enterNames" && (
+            <>
+              {/* STATUS + SCORE */}
+              <div
+                style={{
+                  marginBottom: 8,
+                  padding: 12,
+                  borderRadius: 12,
+                  background: "#020617",
+                  border: "1px solid #1f2937",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: 14,
+                    gap: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span>Round: {currentRoundNumber}</span>
+                  <span>
+                    Patcher: <strong>{currentPatcherName}</strong> | Breaker:{" "}
+                    <strong>{currentBreakerName}</strong>
+                  </span>
+                </div>
+                <div style={{ marginTop: 4, fontSize: 13 }}>
+                  Score — {players[0].name || "Player 1"}:{" "}
+                  {playerScores[0] ?? 0} | {players[1].name || "Player 2"}:{" "}
+                  {playerScores[1] ?? 0}
+                </div>
+              </div>
+
+              {/* PATCHER VIEW */}
+              {phase === "patcherSetup" && isPatcherHere && (
+                <PatcherView
+                  mode={"patcher"}
+                  currentPatcherName={currentPatcherName}
+                  patcherSecretCode={patcherSecretCode}
+                  setPatcherSecretCode={setPatcherSecretCode}
+                  selectedTemplate={selectedTemplate}
+                  setSelectedTemplate={setSelectedTemplate}
+                  positionIndex={positionIndex}
+                  setPositionIndex={setPositionIndex}
+                  positionChar={positionChar}
+                  setPositionChar={setPositionChar}
+                  positionKind={positionKind}
+                  setPositionKind={setPositionKind}
+                  lettersCount={lettersCount}
+                  setLettersCount={setLettersCount}
+                  digitsCount={digitsCount}
+                  setDigitsCount={setDigitsCount}
+                  firstChar={firstChar}
+                  setFirstChar={setFirstChar}
+                  secondChar={secondChar}
+                  setSecondChar={setSecondChar}
+                  mustContainChar={mustContainChar}
+                  setMustContainChar={setMustContainChar}
+                  forbiddenChar={forbiddenChar}
+                  setForbiddenChar={setForbiddenChar}
+                  maxDigitValue={maxDigitValue}
+                  setMaxDigitValue={setMaxDigitValue}
+                  cannotAdjCharA={cannotAdjCharA}
+                  setCannotAdjCharA={setCannotAdjCharA}
+                  cannotAdjCharB={cannotAdjCharB}
+                  setCannotAdjCharB={setCannotAdjCharB}
+                  distinctCount={distinctCount}
+                  setDistinctCount={setDistinctCount}
+                  availableTemplateOptions={availableTemplateOptions}
+                  patcherRuleError={patcherRuleError}
+                  handleConfirmPatcherSetup={handleConfirmPatcherSetup}
+                  visibleRules={visibleRules}
+                  validCodesCount={currentValidCount}
+                />
+              )}
+
+              {phase === "patcherSetup" && !isPatcherHere && (
+                <div
+                  style={{
+                    background: "#111827",
+                    padding: 20,
+                    borderRadius: 12,
+                    textAlign: "center",
+                    maxWidth: 520,
+                    margin: "0 auto",
+                    border: "1px solid #4b5563",
+                  }}
+                >
+                  <h3
+                    style={{
+                      fontSize: 15,
+                      marginBottom: 4,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Waiting for Patcher
+                  </h3>
+                  <p style={{ fontSize: 14 }}>
+                    Waiting for{" "}
+                    <strong>{currentPatcherName || "your opponent"}</strong> to
+                    set the secret code and add a new rule.
+                  </p>
+                </div>
+              )}
+
+              {/* BREAKER VIEW */}
+              {phase === "breakerTurn" && isBreakerHere && (
+                <BreakerView
+                  mode="phone"
+                  currentBreaker={currentBreaker}
+                  breakerGuess={breakerGuess}
+                  setBreakerGuess={setBreakerGuess}
+                  breakerError={breakerError}
+                  handleAddGuess={handleAddGuess}
+                  currentRoundGuesses={currentRoundGuesses}
+                  playerCorrectGuesses={playerCorrectGuesses}
+                  playerIncorrectGuesses={playerIncorrectGuesses}
+                  currentBreakerIndex={currentBreakerIndex}
+                  endgameModeActive={endgameModeActive}
+                  isEndgameWindow={isEndgameWindow}
+                  endgameBaseAttempts={endgameBaseAttempts}
+                  endgameBonusAttempts={endgameBonusAttempts}
+                  endgameAttemptsLeft={endgameAttemptsLeft}
+                  validCodes={validCodes}
+                  visibleRules={visibleRules}
+                  validCodesCount={currentValidCount}
+                  availableTemplatesForThisPatchRound={
+                    templatesAvailableForCurrentRound
+                  }
+                />
+              )}
+
+              {phase === "breakerTurn" && !isBreakerHere && (
+                <>
+                  {endgameModeActive && isEndgameWindow ? (
+                    <BreakerView
+                      mode="phone"
+                      readOnly
+                      currentBreaker={currentBreaker}
+                      breakerGuess={""}
+                      setBreakerGuess={() => {}}
+                      breakerError={null}
+                      handleAddGuess={() => {}}
+                      currentRoundGuesses={currentRoundGuesses}
+                      playerCorrectGuesses={playerCorrectGuesses}
+                      playerIncorrectGuesses={playerIncorrectGuesses}
+                      currentBreakerIndex={currentBreakerIndex}
+                      endgameModeActive={endgameModeActive}
+                      isEndgameWindow={isEndgameWindow}
+                      endgameBaseAttempts={endgameBaseAttempts}
+                      endgameBonusAttempts={endgameBonusAttempts}
+                      endgameAttemptsLeft={endgameAttemptsLeft}
+                      validCodes={validCodes}
+                      visibleRules={visibleRules}
+                      validCodesCount={currentValidCount}
+                      availableTemplatesForThisPatchRound={
+                        templatesAvailableForCurrentRound
+                      }
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        background: "#111827",
+                        padding: 20,
+                        borderRadius: 12,
+                        textAlign: "center",
+                        maxWidth: 520,
+                        margin: "0 auto",
+                        border: "1px solid #4b5563",
+                      }}
+                    >
+                      <h3
+                        style={{
+                          fontSize: 15,
+                          marginBottom: 4,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Waiting for Breaker
+                      </h3>
+                      <p style={{ fontSize: 14 }}>
+                        <strong>{currentBreakerName || "Your opponent"}</strong>{" "}
+                        is currently trying to break the system.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* RESULT SCREENS */}
+              {(phase === "validResult" ||
+                phase === "exactResult" ||
+                phase === "breakerWin" ||
+                phase === "patcherWin") && (
+                <ResultScreens
+                  phase={phase}
+                  lastGuessValue={lastGuessValue}
+                  lastResult={lastResult}
+                  patcherSecretCode={patcherSecretCode}
+                  currentBreakerName={currentBreakerName}
+                  currentPatcherName={currentPatcherName}
+                  onNextRound={advanceToNextRound}
+                  onRestartDuel={handleRestartDuel}
+                  lastBreakerPoints={lastBreakerPoints}
+                  lastPatcherPoints={lastPatcherPoints}
+                />
+              )}
+
+              {/* DUEL HISTORY */}
+              <div
+                style={{
+                  background: "#020617",
+                  padding: 12,
+                  borderRadius: 12,
+                  border: "1px solid #1f2937",
+                  fontSize: 12,
+                  marginTop: 16,
+                }}
+              >
+                <h3 style={{ marginBottom: 8, fontSize: 13 }}>Duel History</h3>
+
+                {rounds.length === 0 || rounds.length === 1 ? (
+                  <p style={{ opacity: 0.6, fontSize: 12 }}>
+                    Once you get further into the duel, completed rounds will
+                    appear here.
+                  </p>
+                ) : (
+                  rounds.map((r) => (
+                    <div
+                      key={r.roundNumber}
+                      style={{
+                        marginBottom: 10,
+                        paddingBottom: 8,
+                        borderBottom: "1px solid #111827",
+                      }}
+                    >
+                      <div style={{ marginBottom: 2 }}>
+                        <strong>Round {r.roundNumber}</strong> — Patcher:{" "}
+                        {players[r.patcherIndex].name}
+                      </div>
+                      <div>Code: {r.secretCode}</div>
+                      <div style={{ opacity: 0.8 }}>Rule: {r.ruleText}</div>
+                    </div>
+                  ))
+                )}
+
+                <button
+                  onClick={handleRestartDuel}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "8px 16px",
+                    borderRadius: 999,
+                    border: "1px solid #4b5563",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    background: "transparent",
+                    color: "#9ca3af",
+                    marginTop: 8,
+                  }}
+                >
+                  Restart Duel
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* HOW TO PLAY MODAL */}
+          <HowToPlayModal
+            isOpen={showHowToPlay}
+            onClose={() => setShowHowToPlay(false)}
+            currentPatcherName={currentPatcherName}
+            currentBreakerName={currentBreakerName}
+            onOpenTutorial={openTutorial}
+          />
+
+          {/* TUTORIAL OVERLAY */}
+          <TutorialOverlay
+            isOpen={tutorialMode !== "none"}
+            initialRole={tutorialMode === "none" ? "breaker" : tutorialMode}
+            onClose={() => setTutorialMode("none")}
+          />
+        </div>
       </div>
-    </div>
+    </LayoutWrapper>
   );
 };
 
