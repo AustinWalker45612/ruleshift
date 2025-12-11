@@ -64,6 +64,17 @@ export const BreakerView: React.FC<BreakerViewProps> = ({
   const isPhone = mode === "phone";
   const isReadOnly = !!readOnly;
 
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    marginTop: 4,
+    padding: 8,
+    borderRadius: 8,
+    border: "1px solid #374151",
+    background: "#020617",
+    color: "#e5e7eb",
+    fontSize: 16, // prevent iOS zoom & keep consistent with other inputs
+  };
+
   return (
     <div
       style={{
@@ -173,16 +184,7 @@ export const BreakerView: React.FC<BreakerViewProps> = ({
           <label style={{ display: "block", marginBottom: 8 }}>
             Your Guess:
             <input
-              style={{
-                width: "100%",
-                marginTop: 4,
-                padding: 8,
-                borderRadius: 8,
-                border: "1px solid #374151",
-                background: "#020617",
-                color: "#e5e7eb",
-                letterSpacing: 2,
-              }}
+              style={{ ...inputStyle, letterSpacing: 2 }}
               value={breakerGuess}
               maxLength={4}
               onChange={(e) => setBreakerGuess(e.target.value.toUpperCase())}

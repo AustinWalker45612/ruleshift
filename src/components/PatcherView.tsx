@@ -105,6 +105,7 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
     border: "1px solid #374151",
     background: "#020617",
     color: "#e5e7eb",
+    fontSize: 16, // prevent iOS zoom & keep consistent
   };
 
   const selectStyle: React.CSSProperties = {
@@ -234,36 +235,48 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
               <label style={{ display: "block", marginBottom: 8 }}>
                 Number of letters:
                 <input
-                  type="number"
-                  min={0}
-                  max={4}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   style={inputStyle}
-                  value={lettersCount}
+                  value={lettersCount.toString()}
                   onChange={(e) => {
-                    const val = Number(e.target.value);
-                    let clamped = isNaN(val) ? 0 : val;
-                    if (clamped < 0) clamped = 0;
-                    if (clamped > 4) clamped = 4;
-                    setLettersCount(clamped);
-                    setDigitsCount(4 - clamped);
+                    const raw = e.target.value.replace(/\D/g, "");
+                    if (!raw) {
+                      setLettersCount(0);
+                      setDigitsCount(4);
+                      return;
+                    }
+                    let n = parseInt(raw, 10);
+                    if (Number.isNaN(n)) n = 0;
+                    if (n < 0) n = 0;
+                    if (n > 4) n = 4;
+                    setLettersCount(n);
+                    setDigitsCount(4 - n);
                   }}
                 />
               </label>
               <label style={{ display: "block" }}>
                 Number of digits:
                 <input
-                  type="number"
-                  min={0}
-                  max={4}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   style={inputStyle}
-                  value={digitsCount}
+                  value={digitsCount.toString()}
                   onChange={(e) => {
-                    const val = Number(e.target.value);
-                    let clamped = isNaN(val) ? 0 : val;
-                    if (clamped < 0) clamped = 0;
-                    if (clamped > 4) clamped = 4;
-                    setDigitsCount(clamped);
-                    setLettersCount(4 - clamped);
+                    const raw = e.target.value.replace(/\D/g, "");
+                    if (!raw) {
+                      setDigitsCount(0);
+                      setLettersCount(4);
+                      return;
+                    }
+                    let n = parseInt(raw, 10);
+                    if (Number.isNaN(n)) n = 0;
+                    if (n < 0) n = 0;
+                    if (n > 4) n = 4;
+                    setDigitsCount(n);
+                    setLettersCount(4 - n);
                   }}
                 />
               </label>
@@ -385,14 +398,23 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
               <label style={{ display: "block" }}>
                 Maximum allowed digit (1–9, digits must be &lt; this):
                 <input
-                  type="number"
-                  min={1}
-                  max={9}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   style={inputStyle}
-                  value={maxDigitValue}
-                  onChange={(e) =>
-                    setMaxDigitValue(Number(e.target.value) || 1)
-                  }
+                  value={maxDigitValue ? String(maxDigitValue) : ""}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "");
+                    if (!raw) {
+                      setMaxDigitValue(1);
+                      return;
+                    }
+                    let n = parseInt(raw, 10);
+                    if (Number.isNaN(n)) n = 1;
+                    if (n < 1) n = 1;
+                    if (n > 9) n = 9;
+                    setMaxDigitValue(n);
+                  }}
                 />
               </label>
             </div>
@@ -505,14 +527,23 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
               <label style={{ display: "block" }}>
                 Distinct characters (1–4):
                 <input
-                  type="number"
-                  min={1}
-                  max={4}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   style={inputStyle}
-                  value={distinctCount}
-                  onChange={(e) =>
-                    setDistinctCount(Number(e.target.value) || 1)
-                  }
+                  value={distinctCount ? String(distinctCount) : ""}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "");
+                    if (!raw) {
+                      setDistinctCount(1);
+                      return;
+                    }
+                    let n = parseInt(raw, 10);
+                    if (Number.isNaN(n)) n = 1;
+                    if (n < 1) n = 1;
+                    if (n > 4) n = 4;
+                    setDistinctCount(n);
+                  }}
                 />
               </label>
             </div>
