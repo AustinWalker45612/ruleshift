@@ -402,11 +402,12 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
                   inputMode="numeric"
                   pattern="[0-9]*"
                   style={inputStyle}
-                  value={maxDigitValue ? String(maxDigitValue) : ""}
+                  value={maxDigitValue === 0 ? "" : String(maxDigitValue)}
                   onChange={(e) => {
                     const raw = e.target.value.replace(/\D/g, "");
                     if (!raw) {
-                      setMaxDigitValue(1);
+                      // allow empty while typing; treat as 0 internally
+                      setMaxDigitValue(0);
                       return;
                     }
                     let n = parseInt(raw, 10);
@@ -414,6 +415,12 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
                     if (n < 1) n = 1;
                     if (n > 9) n = 9;
                     setMaxDigitValue(n);
+                  }}
+                  onBlur={() => {
+                    // normalize to a valid value if left empty/invalid
+                    if (maxDigitValue < 1 || maxDigitValue > 9) {
+                      setMaxDigitValue(1);
+                    }
                   }}
                 />
               </label>
