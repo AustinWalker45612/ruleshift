@@ -143,18 +143,23 @@ export const TabletLayout: React.FC<LayoutProps> = (props) => {
           margin: "0 auto",
         }}
       >
-        {/* HEADER — big-phone style: mostly stacked, but room for buttons on the right */}
+        {/* HEADER — centered for tablet */}
         <header
           style={{
             display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
+            flexDirection: "column",
+            alignItems: "center",
             gap: 10,
             marginBottom: 12,
           }}
         >
-          <div style={{ flex: "1 1 260px", minWidth: 220 }}>
+          <div
+            style={{
+              flex: "1 1 260px",
+              minWidth: 220,
+              textAlign: "center",
+            }}
+          >
             <h1
               style={{
                 marginBottom: 4,
@@ -230,7 +235,7 @@ export const TabletLayout: React.FC<LayoutProps> = (props) => {
               display: "flex",
               flexDirection: "column",
               gap: 6,
-              alignItems: "flex-end",
+              alignItems: "center",
               flexShrink: 0,
             }}
           >
@@ -343,7 +348,7 @@ export const TabletLayout: React.FC<LayoutProps> = (props) => {
                       border: "1px solid #374151",
                       background: "#020617",
                       color: "#e5e7eb",
-                      fontSize: 14,
+                      fontSize: 16, // prevent iOS zoom
                       boxSizing: "border-box",
                     }}
                     value={thisPlayer.name}
@@ -368,7 +373,7 @@ export const TabletLayout: React.FC<LayoutProps> = (props) => {
                     border: "1px solid #4b5563",
                     background: thisPlayer.ready ? "#16a34a" : "#111827",
                     color: thisPlayer.ready ? "#ecfdf5" : "#e5e7eb",
-                    fontSize: 14,
+                    fontSize: 16, // prevent iOS zoom on tap
                     fontWeight: 500,
                     marginBottom: 12,
                     boxSizing: "border-box",
@@ -430,7 +435,7 @@ export const TabletLayout: React.FC<LayoutProps> = (props) => {
                     borderRadius: 999,
                     border: "none",
                     fontWeight: 600,
-                    fontSize: 15,
+                    fontSize: 16, // prevent zoom
                     cursor: bothPlayersReady ? "pointer" : "not-allowed",
                     background: bothPlayersReady ? "#2563eb" : "#1f2937",
                     color: "#e5e7eb",

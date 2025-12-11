@@ -503,7 +503,7 @@ export const DesktopLayout: React.FC<LayoutProps> = (props) => {
                       border: "1px solid #374151",
                       background: "#020617",
                       color: "#e5e7eb",
-                      fontSize: 14,
+                      fontSize: 16, // prevent browser zoom on name input
                     }}
                     value={thisPlayer.name}
                     onChange={(e) => onNameChange(e.target.value)}
@@ -530,7 +530,7 @@ export const DesktopLayout: React.FC<LayoutProps> = (props) => {
                     background: thisPlayer.ready ? "#16a34a" : "#111827",
                     color: thisPlayer.ready ? "#ecfdf5" : "#e5e7eb",
                     marginBottom: 12,
-                    fontSize: 14,
+                    fontSize: 16, // prevent zoom when tapping button
                   }}
                   disabled={!thisPlayer.name.trim()}
                 >
@@ -596,7 +596,7 @@ export const DesktopLayout: React.FC<LayoutProps> = (props) => {
                     cursor: bothPlayersReady ? "pointer" : "not-allowed",
                     background: bothPlayersReady ? "#2563eb" : "#1f2937",
                     color: "#e5e7eb",
-                    fontSize: 15,
+                    fontSize: 16, // keep primary CTA at 16px
                   }}
                 >
                   {bothPlayersReady

@@ -153,7 +153,7 @@ export const BreakerToyExample: React.FC = () => {
             border: "1px solid #374151",
             background: "#020617",
             color: "#e5e7eb",
-            fontSize: 13,
+            fontSize: 16,
             textTransform: "uppercase",
           }}
           onKeyDown={(e) => {

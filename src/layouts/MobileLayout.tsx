@@ -147,17 +147,17 @@ export const MobileLayout: React.FC<LayoutProps> = (props) => {
           margin: "0 auto",
         }}
       >
-        {/* HEADER (stacked, mobile-friendly) */}
+        {/* HEADER (stacked, mobile-friendly, centered) */}
         <header
           style={{
             display: "flex",
             flexDirection: "column",
-            alignItems: "stretch",
+            alignItems: "center",
             gap: 8,
             marginBottom: 10,
           }}
         >
-          <div style={{ textAlign: "left" }}>
+          <div style={{ textAlign: "center", width: "100%" }}>
             <h1
               style={{
                 marginBottom: 2,
@@ -233,7 +233,7 @@ export const MobileLayout: React.FC<LayoutProps> = (props) => {
               display: "flex",
               flexWrap: "wrap",
               gap: 6,
-              justifyContent: "flex-start",
+              justifyContent: "center",
             }}
           >
             <button
@@ -341,7 +341,7 @@ export const MobileLayout: React.FC<LayoutProps> = (props) => {
                       border: "1px solid #374151",
                       background: "#020617",
                       color: "#e5e7eb",
-                      fontSize: 14,
+                      fontSize: 16, // prevent iOS zoom
                       boxSizing: "border-box",
                     }}
                     value={thisPlayer.name}
@@ -366,7 +366,7 @@ export const MobileLayout: React.FC<LayoutProps> = (props) => {
                     border: "1px solid #4b5563",
                     background: thisPlayer.ready ? "#16a34a" : "#111827",
                     color: thisPlayer.ready ? "#ecfdf5" : "#e5e7eb",
-                    fontSize: 14,
+                    fontSize: 16, // prevent iOS zoom on tap
                     fontWeight: 500,
                     marginBottom: 10,
                     boxSizing: "border-box",
@@ -428,7 +428,7 @@ export const MobileLayout: React.FC<LayoutProps> = (props) => {
                     borderRadius: 999,
                     border: "none",
                     fontWeight: 600,
-                    fontSize: 15,
+                    fontSize: 16, // prevent iOS zoom on tap
                     background: bothPlayersReady ? "#2563eb" : "#1f2937",
                     color: "#e5e7eb",
                     boxSizing: "border-box",

@@ -134,10 +134,11 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
         inset: 0,
         background: "rgba(15,23,42,0.9)",
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start", // top-align to avoid "zoomed modal" feel
         justifyContent: "center",
         zIndex: 1300,
-        padding: 16,
+        padding: "16px 12px 24px",
+        overflowY: "auto", // whole overlay scrolls on small screens
       }}
       onClick={onClose}
     >
@@ -152,6 +153,9 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
           padding: 20,
           color: "#e5e7eb",
           fontSize: 14,
+          margin: "24px auto 0", // give some breathing room from top
+          maxHeight: "min(640px, 100vh - 48px)",
+          overflowY: "auto", // inner card scrolls if content is tall
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -162,6 +166,8 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: 12,
+            gap: 8,
+            flexWrap: "wrap",
           }}
         >
           <div
@@ -216,6 +222,7 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
               fontSize: 12,
               padding: "4px 10px",
               cursor: "pointer",
+              flexShrink: 0,
             }}
           >
             Close
