@@ -252,8 +252,6 @@ const App: React.FC = () => {
   const [currentRoundGuesses, setCurrentRoundGuesses] = useState<Guess[]>([]);
 
   // Per-player guess history
-  //the first 4, but your candidate code uses more characters.
-
   const [playerCorrectGuesses, setPlayerCorrectGuesses] = useState<string[][]>(
     [[], []]
   );
@@ -1330,12 +1328,10 @@ const App: React.FC = () => {
           <header
             style={{
               display: "flex",
-              flexDirection: deviceType === "mobile" ? "column" : "row",
-              justifyContent:
-                deviceType === "mobile" ? "flex-start" : "space-between",
+              justifyContent: "space-between",
               alignItems: "flex-start",
-              gap: deviceType === "mobile" ? 8 : 12,
-              marginBottom: deviceType === "mobile" ? 10 : 12,
+              gap: 12,
+              marginBottom: 12,
               flexWrap: "wrap",
             }}
           >
@@ -1343,10 +1339,7 @@ const App: React.FC = () => {
               <h1
                 style={{
                   marginBottom: 4,
-                  fontSize:
-                    deviceType === "mobile"
-                      ? "28px"
-                      : "clamp(30px, 4.2vw, 44px)",
+                  fontSize: "clamp(30px, 4.2vw, 44px)",
                 }}
               >
                 RuleShift
@@ -1355,7 +1348,7 @@ const App: React.FC = () => {
               <p
                 style={{
                   marginBottom: 4,
-                  fontSize: deviceType === "mobile" ? 11 : 12,
+                  fontSize: 12,
                   opacity: 0.75,
                 }}
               >
@@ -1372,7 +1365,7 @@ const App: React.FC = () => {
                 <p
                   style={{
                     marginBottom: 4,
-                    fontSize: deviceType === "mobile" ? 10 : 11,
+                    fontSize: 11,
                     opacity: 0.8,
                   }}
                 >
@@ -1396,7 +1389,7 @@ const App: React.FC = () => {
                 <p
                   style={{
                     marginBottom: 4,
-                    fontSize: deviceType === "mobile" ? 10 : 11,
+                    fontSize: 11,
                     opacity: 0.6,
                   }}
                 >
@@ -1408,10 +1401,7 @@ const App: React.FC = () => {
                 style={{
                   marginTop: 4,
                   marginBottom: 0,
-                  fontSize:
-                    deviceType === "mobile"
-                      ? 12
-                      : "clamp(13px, 1.5vw, 15px)",
+                  fontSize: "clamp(13px, 1.5vw, 15px)",
                 }}
               >
                 Two players. One evolving rule system. Patcher vs Breaker in a
@@ -1422,13 +1412,9 @@ const App: React.FC = () => {
             <div
               style={{
                 display: "flex",
-                flexDirection: deviceType === "mobile" ? "row" : "column",
-                flexWrap: deviceType === "mobile" ? "wrap" : "nowrap",
+                flexDirection: "column",
                 gap: 8,
-                alignItems:
-                  deviceType === "mobile" ? "flex-start" : "flex-end",
-                justifyContent:
-                  deviceType === "mobile" ? "flex-start" : "flex-end",
+                alignItems: "flex-end",
                 flexShrink: 0,
               }}
             >
@@ -1438,15 +1424,13 @@ const App: React.FC = () => {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
-                  padding:
-                    deviceType === "mobile" ? "5px 10px" : "6px 12px",
+                  padding: "6px 12px",
                   borderRadius: 999,
                   border: "1px solid #4b5563",
                   background: "#020617",
                   color: "#e5e7eb",
                   fontSize: 11,
                   cursor: "pointer",
-                  whiteSpace: "nowrap",
                 }}
               >
                 <span>Copy room link</span>
@@ -1464,13 +1448,12 @@ const App: React.FC = () => {
                 onClick={() => setShowHowToPlay(true)}
                 style={{
                   borderRadius: 999,
-                  padding:
-                    deviceType === "mobile" ? "5px 10px" : "6px 12px",
+                  padding: "6px 12px",
                   border: "1px solid #4b5563",
                   background: "#020617",
                   color: "#e5e7eb",
                   cursor: "pointer",
-                  fontSize: deviceType === "mobile" ? 12 : 13,
+                  fontSize: 13,
                   whiteSpace: "nowrap",
                 }}
               >
@@ -1481,13 +1464,12 @@ const App: React.FC = () => {
                 onClick={() => openTutorial("breaker")}
                 style={{
                   borderRadius: 999,
-                  padding:
-                    deviceType === "mobile" ? "5px 10px" : "6px 12px",
+                  padding: "6px 12px",
                   border: "1px solid #4b5563",
                   background: "#020617",
                   color: "#e5e7eb",
                   cursor: "pointer",
-                  fontSize: deviceType === "mobile" ? 11 : 12,
+                  fontSize: 12,
                   whiteSpace: "nowrap",
                 }}
               >
@@ -1503,23 +1485,17 @@ const App: React.FC = () => {
                 <div
                   style={{
                     background: "#111827",
-                    padding: deviceType === "mobile" ? 14 : 20,
-                    borderRadius: 12,
-                    boxShadow:
-                      deviceType === "mobile"
-                        ? "0 6px 16px rgba(0,0,0,0.45)"
-                        : "0 10px 25px rgba(0,0,0,0.4)",
-                    maxWidth: deviceType === "mobile" ? 480 : 560,
+                    padding: 20,
+                    borderRadius: 14,
+                    boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
+                    maxWidth: 560,
                     margin: "0 auto",
                   }}
                 >
                   <h2
                     style={{
                       marginBottom: 8,
-                      fontSize:
-                        deviceType === "mobile"
-                          ? 18
-                          : "clamp(18px,2.3vw,22px)",
+                      fontSize: "clamp(18px,2.3vw,22px)",
                     }}
                   >
                     {thisPlayerIndex === 0
@@ -1529,7 +1505,7 @@ const App: React.FC = () => {
                   <p
                     style={{
                       marginBottom: 12,
-                      fontSize: deviceType === "mobile" ? 11 : 12,
+                      fontSize: 12,
                       opacity: 0.7,
                     }}
                   >
@@ -1548,12 +1524,12 @@ const App: React.FC = () => {
                         width: "100%",
                         boxSizing: "border-box",
                         marginTop: 4,
-                        padding: deviceType === "mobile" ? 8 : 10,
+                        padding: 10,
                         borderRadius: 8,
                         border: "1px solid #374151",
                         background: "#020617",
                         color: "#e5e7eb",
-                        fontSize: deviceType === "mobile" ? 13 : 14,
+                        fontSize: 14,
                       }}
                       value={thisPlayer.name}
                       onChange={(e) => handleNameChange(e.target.value)}
@@ -1572,8 +1548,7 @@ const App: React.FC = () => {
                     style={{
                       width: "100%",
                       boxSizing: "border-box",
-                      padding:
-                        deviceType === "mobile" ? "9px 14px" : "10px 16px",
+                      padding: "10px 16px",
                       borderRadius: 999,
                       border: "1px solid #4b5563",
                       fontWeight: 500,
@@ -1583,7 +1558,7 @@ const App: React.FC = () => {
                       background: thisPlayer.ready ? "#16a34a" : "#111827",
                       color: thisPlayer.ready ? "#ecfdf5" : "#e5e7eb",
                       marginBottom: 12,
-                      fontSize: deviceType === "mobile" ? 13 : 14,
+                      fontSize: 14,
                     }}
                     disabled={!thisPlayer.name.trim()}
                   >
@@ -1596,7 +1571,7 @@ const App: React.FC = () => {
                       borderRadius: 8,
                       padding: 8,
                       border: "1px solid #1f2937",
-                      fontSize: deviceType === "mobile" ? 11 : 12,
+                      fontSize: 12,
                       marginBottom: 12,
                     }}
                   >
@@ -1642,15 +1617,14 @@ const App: React.FC = () => {
                     style={{
                       width: "100%",
                       boxSizing: "border-box",
-                      padding:
-                        deviceType === "mobile" ? "10px 14px" : "11px 16px",
+                      padding: "11px 16px",
                       borderRadius: 999,
                       border: "none",
                       fontWeight: 600,
                       cursor: bothPlayersReady ? "pointer" : "not-allowed",
                       background: bothPlayersReady ? "#2563eb" : "#1f2937",
                       color: "#e5e7eb",
-                      fontSize: deviceType === "mobile" ? 14 : 15,
+                      fontSize: 15,
                     }}
                   >
                     {bothPlayersReady
@@ -1662,23 +1636,17 @@ const App: React.FC = () => {
                 <div
                   style={{
                     background: "#111827",
-                    padding: deviceType === "mobile" ? 14 : 20,
-                    borderRadius: 12,
-                    boxShadow:
-                      deviceType === "mobile"
-                        ? "0 6px 16px rgba(0,0,0,0.45)"
-                        : "0 10px 25px rgba(0,0,0,0.4)",
-                    maxWidth: deviceType === "mobile" ? 480 : 560,
+                    padding: 20,
+                    borderRadius: 14,
+                    boxShadow: "0 10px 25px rgba(0,0,0,0.4)",
+                    maxWidth: 560,
                     margin: "0 auto",
                   }}
                 >
                   <h2
                     style={{
                       marginBottom: 8,
-                      fontSize:
-                        deviceType === "mobile"
-                          ? 18
-                          : "clamp(18px,2.3vw,22px)",
+                      fontSize: "clamp(18px,2.3vw,22px)",
                     }}
                   >
                     Spectator Lobby
@@ -1686,7 +1654,7 @@ const App: React.FC = () => {
                   <p
                     style={{
                       marginBottom: 12,
-                      fontSize: deviceType === "mobile" ? 11 : 12,
+                      fontSize: 12,
                       opacity: 0.7,
                     }}
                   >
@@ -1700,7 +1668,7 @@ const App: React.FC = () => {
                       borderRadius: 8,
                       padding: 8,
                       border: "1px solid #1f2937",
-                      fontSize: deviceType === "mobile" ? 11 : 12,
+                      fontSize: 12,
                       marginBottom: 8,
                     }}
                   >
@@ -1742,7 +1710,7 @@ const App: React.FC = () => {
 
                   <p
                     style={{
-                      fontSize: deviceType === "mobile" ? 11 : 12,
+                      fontSize: 12,
                       opacity: 0.7,
                       marginTop: 8,
                     }}
