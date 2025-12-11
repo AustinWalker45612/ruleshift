@@ -1309,7 +1309,15 @@ const App: React.FC = () => {
 
   return (
     <LayoutWrapper>
-      <div>
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          boxSizing: "border-box",
+          fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+          color: "#e5e7eb",
+        }}
+      >
         {/* Onboarding overlay */}
         <OnboardingOverlay
           isOpen={showOnboarding}
