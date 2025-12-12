@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// src/components/PatcherView.tsx
+import React from "react";
 import type { Rule, RuleTemplate } from "../game/gameTypes";
 import { ActiveRulesPanel } from "./ActiveRulesPanel";
 
@@ -96,16 +97,6 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
 }) => {
   const isPhone = mode === "patcher";
 
-  // Local string state for the exactLettersDigits inputs so typing feels normal.
-  const [lettersInput, setLettersInput] = useState(lettersCount.toString());
-  const [digitsInput, setDigitsInput] = useState(digitsCount.toString());
-
-  // Keep local inputs in sync if parent state changes (e.g. reset, new round)
-  useEffect(() => {
-    setLettersInput(lettersCount.toString());
-    setDigitsInput(digitsCount.toString());
-  }, [lettersCount, digitsCount]);
-
   const inputStyle: React.CSSProperties = {
     width: "100%",
     boxSizing: "border-box",
@@ -115,7 +106,7 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
     border: "1px solid #374151",
     background: "#020617",
     color: "#e5e7eb",
-    fontSize: 16, // prevent iOS zoom & keep consistent
+    fontSize: 16, // avoid iOS zoom
   };
 
   const selectStyle: React.CSSProperties = {
@@ -243,7 +234,7 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
                 other.
               </p>
 
-              {/* Letters input */}
+              {/* Letters */}
               <label style={{ display: "block", marginBottom: 8 }}>
                 Number of letters:
                 <input
@@ -251,54 +242,27 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
                   inputMode="numeric"
                   pattern="[0-9]*"
                   style={inputStyle}
-                  value={lettersInput}
+                  value={lettersCount.toString()}
                   onChange={(e) => {
                     const raw = e.target.value.replace(/\D/g, "");
-                    // Let the user clear the field without snapping
-                    setLettersInput(raw);
-
                     if (!raw) {
-                      // Don't update counts yet; wait for a valid number or blur
-                      return;
-                    }
-
-                    let n = parseInt(raw, 10);
-                    if (Number.isNaN(n)) return;
-
-                    if (n < 0) n = 0;
-                    if (n > 4) n = 4;
-
-                    const d = 4 - n;
-
-                    setLettersCount(n);
-                    setDigitsCount(d);
-                    setDigitsInput(d.toString());
-                  }}
-                  onBlur={() => {
-                    if (lettersInput === "") {
-                      // Default if left empty: 0 letters, 4 digits
+                      // default 0 letters / 4 digits
                       setLettersCount(0);
                       setDigitsCount(4);
-                      setLettersInput("0");
-                      setDigitsInput("4");
                       return;
                     }
-
-                    let n = parseInt(lettersInput, 10);
+                    // take only last digit typed
+                    let n = parseInt(raw[raw.length - 1], 10);
                     if (Number.isNaN(n)) n = 0;
                     if (n < 0) n = 0;
                     if (n > 4) n = 4;
-                    const d = 4 - n;
-
                     setLettersCount(n);
-                    setDigitsCount(d);
-                    setLettersInput(n.toString());
-                    setDigitsInput(d.toString());
+                    setDigitsCount(4 - n);
                   }}
                 />
               </label>
 
-              {/* Digits input */}
+              {/* Digits */}
               <label style={{ display: "block" }}>
                 Number of digits:
                 <input
@@ -306,47 +270,21 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
                   inputMode="numeric"
                   pattern="[0-9]*"
                   style={inputStyle}
-                  value={digitsInput}
+                  value={digitsCount.toString()}
                   onChange={(e) => {
                     const raw = e.target.value.replace(/\D/g, "");
-                    setDigitsInput(raw);
-
                     if (!raw) {
-                      return;
-                    }
-
-                    let n = parseInt(raw, 10);
-                    if (Number.isNaN(n)) return;
-
-                    if (n < 0) n = 0;
-                    if (n > 4) n = 4;
-
-                    const l = 4 - n;
-
-                    setDigitsCount(n);
-                    setLettersCount(l);
-                    setLettersInput(l.toString());
-                  }}
-                  onBlur={() => {
-                    if (digitsInput === "") {
-                      // Default if left empty: 4 digits, 0 letters
+                      // default 4 digits / 0 letters
                       setDigitsCount(4);
                       setLettersCount(0);
-                      setDigitsInput("4");
-                      setLettersInput("0");
                       return;
                     }
-
-                    let n = parseInt(digitsInput, 10);
+                    let n = parseInt(raw[raw.length - 1], 10);
                     if (Number.isNaN(n)) n = 0;
                     if (n < 0) n = 0;
                     if (n > 4) n = 4;
-                    const l = 4 - n;
-
                     setDigitsCount(n);
-                    setLettersCount(l);
-                    setDigitsInput(n.toString());
-                    setLettersInput(l.toString());
+                    setLettersCount(4 - n);
                   }}
                 />
               </label>
@@ -472,24 +410,19 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
                   inputMode="numeric"
                   pattern="[0-9]*"
                   style={inputStyle}
-                  value={maxDigitValue === 0 ? "" : String(maxDigitValue)}
+                  value={maxDigitValue ? String(maxDigitValue) : ""}
                   onChange={(e) => {
                     const raw = e.target.value.replace(/\D/g, "");
                     if (!raw) {
-                      // allow empty while typing; treat as 0 internally
-                      setMaxDigitValue(0);
+                      // default back to 1 if cleared
+                      setMaxDigitValue(1);
                       return;
                     }
-                    let n = parseInt(raw, 10);
+                    let n = parseInt(raw[raw.length - 1], 10);
                     if (Number.isNaN(n)) n = 1;
                     if (n < 1) n = 1;
                     if (n > 9) n = 9;
                     setMaxDigitValue(n);
-                  }}
-                  onBlur={() => {
-                    if (maxDigitValue < 1 || maxDigitValue > 9) {
-                      setMaxDigitValue(1);
-                    }
                   }}
                 />
               </label>
@@ -614,7 +547,7 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
                       setDistinctCount(1);
                       return;
                     }
-                    let n = parseInt(raw, 10);
+                    let n = parseInt(raw[raw.length - 1], 10);
                     if (Number.isNaN(n)) n = 1;
                     if (n < 1) n = 1;
                     if (n > 4) n = 4;
