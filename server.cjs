@@ -42,15 +42,7 @@ app.get("/health", (req, res) => {
 });
 
 // ✅ Mount auth routes (/auth/register, /auth/login, /auth/me, /auth/logout)
-app.use(
-  "/auth",
-  createAuthRouter({
-    prisma,
-    jwtSecret: JWT_SECRET,
-    cookieName: AUTH_COOKIE_NAME,
-    isProd: IS_PROD,
-  })
-);
+app.use("/auth", authRouter);
 
 // -------------------- HTTP server (Express + Socket.IO) --------------------
 const server = http.createServer(app);
