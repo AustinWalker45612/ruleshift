@@ -22,6 +22,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  height: 100%;
   background: #0f172a;
   color: #e5e7eb;
 }
