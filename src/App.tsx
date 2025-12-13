@@ -1,6 +1,6 @@
 // src/App.tsx
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import {Routes, Route, Navigate, useParams } from "react-router-dom";
 import { HomePage } from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import GameRoom from "./screens/GameRoom";
