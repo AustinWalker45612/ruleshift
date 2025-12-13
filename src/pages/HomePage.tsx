@@ -65,7 +65,7 @@ export const HomePage: React.FC = () => {
   const inputStyle: React.CSSProperties = {
     width: "100%",
     boxSizing: "border-box",
-    marginTop: 0,
+    marginTop: 6,
     padding: 10,
     borderRadius: 10,
     border: "1px solid #374151",
@@ -137,7 +137,7 @@ export const HomePage: React.FC = () => {
         </div>
 
         <h1 style={{ margin: 0, fontSize: 28, paddingRight: 120 }}>RuleShift</h1>
-        <p style={{ marginTop: 0, opacity: 0.9, fontSize: 14 }}>
+        <p style={{ marginTop: 8, opacity: 0.9, fontSize: 14 }}>
           A two-player duel: one patches the rules, the other breaks the code.
         </p>
 
