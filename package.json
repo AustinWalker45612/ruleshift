@@ -8,8 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "ws-server": "node server.cjs",
-    "start": "node server.cjs"
+    "postinstall": "prisma generate",
+    "start": "node server.cjs",
+    "ws-server": "node server.cjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",
