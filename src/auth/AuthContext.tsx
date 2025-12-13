@@ -4,6 +4,7 @@ import React, {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
   } from "react";
   
@@ -21,17 +22,11 @@ import React, {
   
     refreshMe: () => Promise<void>;
     login: (email: string, password: string) => Promise<void>;
-    register: (
-      email: string,
-      password: string,
-      displayName: string
-    ) => Promise<void>;
+    register: (email: string, password: string, displayName: string) => Promise<void>;
     logout: () => Promise<void>;
   };
   
   const AuthContext = createContext<AuthContextValue | null>(null);
-  
-  const LS_AUTH_USER_KEY = "ruleshiftAuthUser_v1";
   
   async function safeJson(res: Response) {
     try {
@@ -49,59 +44,37 @@ import React, {
     return "http://localhost:4000";
   }
   
-  function readCachedUser(): AuthUser | null {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = window.localStorage.getItem(LS_AUTH_USER_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw) as AuthUser;
-    } catch {
-      return null;
-    }
-  }
-  
-  function writeCachedUser(user: AuthUser | null) {
-    if (typeof window === "undefined") return;
-    try {
-      if (!user) window.localStorage.removeItem(LS_AUTH_USER_KEY);
-      else window.localStorage.setItem(LS_AUTH_USER_KEY, JSON.stringify(user));
-    } catch {
-      // ignore
-    }
-  }
-  
-  export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-    children,
-  }) => {
-    // ✅ Hydrate instantly so UI reflects "logged in" without a refresh
-    const [user, setUser] = useState<AuthUser | null>(() => readCachedUser());
+  export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [user, setUser] = useState<AuthUser | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+    // Incrementing token to prevent stale responses overwriting newer auth state
+    const authOpIdRef = useRef(0);
   
     const isAuthenticated = !!user;
   
     const refreshMe = async () => {
       const API = getApiBase();
+      const opId = ++authOpIdRef.current;
+  
       const res = await fetch(`${API}/auth/me`, {
         method: "GET",
         credentials: "include",
+        cache: "no-store",
       });
   
       const data = await safeJson(res);
   
+      // If a newer auth op happened while this request was in-flight, ignore this response.
+      if (opId !== authOpIdRef.current) return;
+  
       if (!res.ok) {
         setUser(null);
-        writeCachedUser(null);
         return;
       }
   
-      if (data?.user) {
-        const u = data.user as AuthUser;
-        setUser(u);
-        writeCachedUser(u);
-      } else {
-        setUser(null);
-        writeCachedUser(null);
-      }
+      if (data?.user) setUser(data.user as AuthUser);
+      else setUser(null);
     };
   
     useEffect(() => {
@@ -124,6 +97,8 @@ import React, {
   
     const login = async (email: string, password: string) => {
       const API = getApiBase();
+      const opId = ++authOpIdRef.current;
+  
       const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         credentials: "include",
@@ -140,21 +115,16 @@ import React, {
         throw new Error("Invalid login response.");
       }
   
-      // ✅ immediate UI update (no refresh needed)
-      const u = data.user as AuthUser;
-      setUser(u);
-      writeCachedUser(u);
+      // only apply if still latest op
+      if (opId !== authOpIdRef.current) return;
   
-      // Optional: if you want to immediately validate cookie/session:
-      // await refreshMe();
+      setUser(data.user as AuthUser);
     };
   
-    const register = async (
-      email: string,
-      password: string,
-      displayName: string
-    ) => {
+    const register = async (email: string, password: string, displayName: string) => {
       const API = getApiBase();
+      const opId = ++authOpIdRef.current;
+  
       const res = await fetch(`${API}/auth/register`, {
         method: "POST",
         credentials: "include",
@@ -171,23 +141,23 @@ import React, {
         throw new Error("Invalid registration response.");
       }
   
-      // ✅ immediate UI update (no refresh needed)
-      const u = data.user as AuthUser;
-      setUser(u);
-      writeCachedUser(u);
+      if (opId !== authOpIdRef.current) return;
   
-      // Optional: validate cookie/session immediately:
-      // await refreshMe();
+      setUser(data.user as AuthUser);
     };
   
     const logout = async () => {
       const API = getApiBase();
+      const opId = ++authOpIdRef.current;
+  
       await fetch(`${API}/auth/logout`, {
         method: "POST",
         credentials: "include",
       }).catch(() => {});
+  
+      if (opId !== authOpIdRef.current) return;
+  
       setUser(null);
-      writeCachedUser(null);
     };
   
     const value = useMemo<AuthContextValue>(
