@@ -15,6 +15,14 @@ const {
 
 const router = express.Router();
 
+function makeTokenPayload(user) {
+  return {
+    sub: user.id,
+    email: user.email,
+    displayName: user.displayName,
+  };
+}
+
 router.post("/register", async (req, res) => {
   try {
     const email = String(req.body?.email || "").trim().toLowerCase();
@@ -22,10 +30,14 @@ router.post("/register", async (req, res) => {
     const displayName = String(req.body?.displayName || "").trim();
 
     if (!email || !password || !displayName) {
-      return res.status(400).json({ error: "email, password, and displayName are required" });
+      return res
+        .status(400)
+        .json({ error: "email, password, and displayName are required" });
     }
     if (password.length < 8) {
-      return res.status(400).json({ error: "Password must be at least 8 characters" });
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 8 characters" });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -37,7 +49,8 @@ router.post("/register", async (req, res) => {
       data: { email, passwordHash, displayName },
     });
 
-    const token = signToken(user);
+    // ✅ IMPORTANT: sign a payload with sub
+    const token = signToken(makeTokenPayload(user));
     setAuthCookie(res, token);
 
     return res.status(201).json({ user: sanitizeUser(user) });
@@ -56,13 +69,15 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "email and password are required" });
     }
 
+    // include passwordHash for verification
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
     const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
-    const token = signToken(user);
+    // ✅ IMPORTANT: sign a payload with sub
+    const token = signToken(makeTokenPayload(user));
     setAuthCookie(res, token);
 
     return res.status(200).json({ user: sanitizeUser(user) });
