@@ -909,13 +909,18 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
       return;
     }
 
-    const alreadyInCurrentRound = currentRoundGuesses.some((g) => g.value === guess);
+    const alreadyInCurrentRound = currentRoundGuesses.some(
+      (g) => g.value === guess
+    );
     if (alreadyInCurrentRound) {
-      setBreakerError("⚠️ You’ve already tried this code this round. Pick a different one.");
+      setBreakerError(
+        "⚠️ You’ve already tried this code this round. Pick a different one."
+      );
       return;
     }
 
-    const wasIncorrectBefore = playerIncorrectGuesses[currentBreakerIndex].includes(guess);
+    const wasIncorrectBefore =
+      playerIncorrectGuesses[currentBreakerIndex].includes(guess);
     if (wasIncorrectBefore) {
       setBreakerError(
         "⚠️ You’ve already tried this code earlier in the duel and it was INVALID. Try a different one."
@@ -948,7 +953,9 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         setEndgameAttemptsLeft(newAttempts);
 
         if (newAttempts <= 0) {
-          const invalidsThisRound = updatedGuesses.filter((g) => g.result === "INVALID").length;
+          const invalidsThisRound = updatedGuesses.filter(
+            (g) => g.result === "INVALID"
+          ).length;
 
           const patcherPoints = computePatcherScore({
             validCodesAtStart: currentValidCount,
@@ -956,7 +963,10 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
             endgameWin: true,
           });
 
-          const updatedScores: [number, number] = [...playerScores] as [number, number];
+          const updatedScores: [number, number] = [...playerScores] as [
+            number,
+            number
+          ];
           updatedScores[currentPatcherIndex] += patcherPoints;
           setPlayerScores(updatedScores);
 
@@ -1032,7 +1042,9 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     const updatedRounds = [...rounds, newRound];
     setRounds(updatedRounds);
 
-    const invalidsThisRound = updatedGuesses.filter((g) => g.result === "INVALID").length;
+    const invalidsThisRound = updatedGuesses.filter(
+      (g) => g.result === "INVALID"
+    ).length;
 
     const breakerPoints = computeBreakerScore({
       validCodesAtStart: currentValidCount,
@@ -1046,7 +1058,10 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
       endgameWin: false,
     });
 
-    const updatedScores: [number, number] = [...playerScores] as [number, number];
+    const updatedScores: [number, number] = [...playerScores] as [
+      number,
+      number
+    ];
     updatedScores[currentBreakerIndex] += breakerPoints;
     updatedScores[currentPatcherIndex] += patcherPoints;
     setPlayerScores(updatedScores);
@@ -1235,7 +1250,8 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     // players only (not spectators)
     if (playerSeat === null) return;
 
-    const winnerIndex = phase === "breakerWin" ? currentBreakerIndex : currentPatcherIndex;
+    const winnerIndex =
+      phase === "breakerWin" ? currentBreakerIndex : currentPatcherIndex;
     const outcome = winnerIndex === thisPlayerIndex ? "WIN" : "LOSS";
 
     const scoreEarned = playerScores[thisPlayerIndex] ?? 0;
@@ -1246,7 +1262,12 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
 
     (async () => {
       try {
-        await fetch(`/stats/duel/complete`, {
+        // ✅ Use your API base if you have one; otherwise this hits same-origin.
+        const API =
+          (import.meta as any)?.env?.VITE_API_URL?.replace(/\/+$/, "") ||
+          "http://localhost:4000";
+
+        await fetch(`${API}/stats/duel/complete`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
