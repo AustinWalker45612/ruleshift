@@ -11,7 +11,7 @@ const {
   clearAuthCookie,
   getTokenFromReq,
   verifyToken,
-} = require("../utils/auth");
+} = require("../utils/auth.cjs");
 
 const router = express.Router();
 const prisma = new PrismaClient();
