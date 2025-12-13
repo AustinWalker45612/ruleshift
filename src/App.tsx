@@ -13,14 +13,12 @@ const RoomRoute: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/room/:roomId" element={<RoomRoute />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </BrowserRouter>
   );
 };
 
