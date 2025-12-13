@@ -7,7 +7,7 @@ const { Server } = require("socket.io");
 require("dotenv").config();
 
 // ✅ Auth router (new)
-const { createAuthRouter } = require("./src/routes/auth.routes.cjs");
+const { authRouter } = require("./src/routes/auth.routes.cjs");
 
 const { prisma, pool } = require("./src/db.cjs");
 
