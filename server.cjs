@@ -9,18 +9,7 @@ require("dotenv").config();
 // ✅ Auth router (new)
 const { createAuthRouter } = require("./src/routes/auth.routes.cjs");
 
-// Prisma setup
-const { PrismaClient } = require("./src/generated/client.cjs");
-const { Pool } = require("pg");
-const { PrismaPg } = require("@prisma/adapter-pg");
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const prisma = new PrismaClient({
-  adapter: new PrismaPg(pool),
-});
+const { prisma, pool } = require("./src/db.cjs");
 
 // -------------------- Config --------------------
 const PORT = process.env.PORT || 4000;

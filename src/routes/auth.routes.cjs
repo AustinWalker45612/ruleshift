@@ -1,6 +1,6 @@
 // src/routes/auth.routes.js
 const express = require("express");
-const { PrismaClient } = require("@prisma/client");
+const { prisma } = require("../db.cjs");
 
 const {
   hashPassword,
