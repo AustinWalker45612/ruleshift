@@ -1,5 +1,5 @@
 // src/screens/GameRoom.tsx
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { socket } from "../socket";
 import { useAuth } from "../auth/AuthContext";
 
@@ -200,9 +200,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     useState<RuleTemplate>("positionEquals");
   const [positionIndex, setPositionIndex] = useState<number>(1);
   const [positionChar, setPositionChar] = useState<string>("");
-  const [positionKind, setPositionKind] = useState<"letter" | "digit">(
-    "letter"
-  );
+  const [positionKind, setPositionKind] = useState<"letter" | "digit">("letter");
   const [lettersCount, setLettersCount] = useState<number>(2);
   const [digitsCount, setDigitsCount] = useState<number>(2);
   const [firstChar, setFirstChar] = useState<string>("");
@@ -269,6 +267,17 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
   const currentBreaker = players[currentBreakerIndex];
 
   const bothPlayersReady = players[0].ready && players[1].ready;
+
+  const isSpectator = playerSeat === null;
+  const thisPlayerIndex = playerSeat ?? 0;
+  const thisPlayer = players[thisPlayerIndex];
+
+  const isPatcherHere = !isSpectator && playerSeat === currentPatcherIndex;
+  const isBreakerHere = !isSpectator && playerSeat === currentBreakerIndex;
+
+  // ✅ Only breaker initializes endgame attempts (prevents refresh reset + double init)
+  const isBreakerClient =
+    playerSeat !== null && playerSeat === currentBreakerIndex;
 
   const TOTAL_CODES = 36 ** 4;
 
@@ -479,21 +488,51 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     }
   }, [phase, currentValidCount]);
 
+  // ✅ FIX: do NOT reset attempts on refresh / mount.
+  // Only breaker initializes endgame once; everyone else just receives synced state.
   useEffect(() => {
-    if (phase === "breakerTurn") {
-      if (isEndgameWindow && endgameStats) {
-        setEndgameModeActive(true);
-        setEndgameBaseAttempts(endgameStats.baseAttempts);
-        setEndgameBonusAttempts(endgameStats.bonusAttempts);
-        setEndgameAttemptsLeft(endgameStats.totalAttempts);
-      } else {
+    if (phase !== "breakerTurn") return;
+    if (!isBreakerClient) return;
+
+    // If we already have attempts (from synced state), do NOT overwrite.
+    if (endgameModeActive || endgameAttemptsLeft > 0) return;
+
+    if (isEndgameWindow && endgameStats) {
+      setEndgameModeActive(true);
+      setEndgameBaseAttempts(endgameStats.baseAttempts);
+      setEndgameBonusAttempts(endgameStats.bonusAttempts);
+      setEndgameAttemptsLeft(endgameStats.totalAttempts);
+
+      broadcastState({
+        endgameModeActive: true,
+        endgameBaseAttempts: endgameStats.baseAttempts,
+        endgameBonusAttempts: endgameStats.bonusAttempts,
+        endgameAttemptsLeft: endgameStats.totalAttempts,
+      });
+    } else {
+      // Ensure endgame is off (but avoid spam)
+      if (endgameModeActive || endgameAttemptsLeft !== 0) {
         setEndgameModeActive(false);
         setEndgameBaseAttempts(0);
         setEndgameBonusAttempts(0);
         setEndgameAttemptsLeft(0);
+
+        broadcastState({
+          endgameModeActive: false,
+          endgameBaseAttempts: 0,
+          endgameBonusAttempts: 0,
+          endgameAttemptsLeft: 0,
+        });
       }
     }
-  }, [phase, isEndgameWindow, endgameStats]);
+  }, [
+    phase,
+    isBreakerClient,
+    isEndgameWindow,
+    endgameStats,
+    endgameModeActive,
+    endgameAttemptsLeft,
+  ]);
 
   const visibleRules =
     phase === "breakerTurn"
@@ -799,8 +838,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         break;
       }
       case "noAdjacentDuplicates": {
-        description =
-          "No two adjacent characters in the code can be identical.";
+        description = "No two adjacent characters in the code can be identical.";
         newRule = { id: nextRuleId, type: "noAdjacentDuplicates", description };
         break;
       }
@@ -871,19 +909,13 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
       return;
     }
 
-    const alreadyInCurrentRound = currentRoundGuesses.some(
-      (g) => g.value === guess
-    );
+    const alreadyInCurrentRound = currentRoundGuesses.some((g) => g.value === guess);
     if (alreadyInCurrentRound) {
-      setBreakerError(
-        "⚠️ You’ve already tried this code this round. Pick a different one."
-      );
+      setBreakerError("⚠️ You’ve already tried this code this round. Pick a different one.");
       return;
     }
 
-    const wasIncorrectBefore =
-      playerIncorrectGuesses[currentBreakerIndex].includes(guess);
-
+    const wasIncorrectBefore = playerIncorrectGuesses[currentBreakerIndex].includes(guess);
     if (wasIncorrectBefore) {
       setBreakerError(
         "⚠️ You’ve already tried this code earlier in the duel and it was INVALID. Try a different one."
@@ -892,7 +924,6 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     }
 
     const passesVisibleRules = passesAllRules(guess, visibleRules);
-
     if (!passesVisibleRules) {
       setBreakerError("Breaks one of the previously implemented rules.");
       return;
@@ -917,9 +948,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         setEndgameAttemptsLeft(newAttempts);
 
         if (newAttempts <= 0) {
-          const invalidsThisRound = updatedGuesses.filter(
-            (g) => g.result === "INVALID"
-          ).length;
+          const invalidsThisRound = updatedGuesses.filter((g) => g.result === "INVALID").length;
 
           const patcherPoints = computePatcherScore({
             validCodesAtStart: currentValidCount,
@@ -927,10 +956,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
             endgameWin: true,
           });
 
-          const updatedScores: [number, number] = [...playerScores] as [
-            number,
-            number
-          ];
+          const updatedScores: [number, number] = [...playerScores] as [number, number];
           updatedScores[currentPatcherIndex] += patcherPoints;
           setPlayerScores(updatedScores);
 
@@ -1006,9 +1032,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     const updatedRounds = [...rounds, newRound];
     setRounds(updatedRounds);
 
-    const invalidsThisRound = updatedGuesses.filter(
-      (g) => g.result === "INVALID"
-    ).length;
+    const invalidsThisRound = updatedGuesses.filter((g) => g.result === "INVALID").length;
 
     const breakerPoints = computeBreakerScore({
       validCodesAtStart: currentValidCount,
@@ -1022,10 +1046,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
       endgameWin: false,
     });
 
-    const updatedScores: [number, number] = [...playerScores] as [
-      number,
-      number
-    ];
+    const updatedScores: [number, number] = [...playerScores] as [number, number];
     updatedScores[currentBreakerIndex] += breakerPoints;
     updatedScores[currentPatcherIndex] += patcherPoints;
     setPlayerScores(updatedScores);
@@ -1103,6 +1124,11 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
       lastBreakerPoints: null,
       lastPatcherPoints: null,
       templatesAvailableForCurrentRound: [],
+      endgameModeActive: false,
+      endgameAttemptsLeft: 0,
+      endgameBaseAttempts: 0,
+      endgameBonusAttempts: 0,
+      prevValidCodesCount: null,
     });
   };
 
@@ -1155,13 +1181,6 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
   const currentPatcherName = currentPatcher.name || "?";
   const currentBreakerName = players[1 - currentPatcherIndex].name || "?";
 
-  const isSpectator = playerSeat === null;
-  const thisPlayerIndex = playerSeat ?? 0;
-  const thisPlayer = players[thisPlayerIndex];
-
-  const isPatcherHere = !isSpectator && playerSeat === currentPatcherIndex;
-  const isBreakerHere = !isSpectator && playerSeat === currentBreakerIndex;
-
   // --- name handlers for this seat ---
   const handleConfirmName = () => {
     if (isSpectator || playerSeat === null) return;
@@ -1201,6 +1220,53 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
       return updated;
     });
   };
+
+  // ✅ Logged-in-only duel stats (call once when duel ends)
+  const reportedDuelRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const duelEnded = phase === "breakerWin" || phase === "patcherWin";
+    if (!duelEnded) return;
+
+    // logged-in only
+    const userId = (user as any)?.id; // sanitizeUser likely includes id
+    if (!userId) return;
+
+    // players only (not spectators)
+    if (playerSeat === null) return;
+
+    const winnerIndex = phase === "breakerWin" ? currentBreakerIndex : currentPatcherIndex;
+    const outcome = winnerIndex === thisPlayerIndex ? "WIN" : "LOSS";
+
+    const scoreEarned = playerScores[thisPlayerIndex] ?? 0;
+
+    const duelKey = `${roomId}:${rounds.length}:${phase}:${winnerIndex}`;
+    if (reportedDuelRef.current === duelKey) return;
+    reportedDuelRef.current = duelKey;
+
+    (async () => {
+      try {
+        await fetch(`/stats/duel/complete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ scoreEarned, outcome, duelKey }),
+        });
+      } catch (e) {
+        console.error("Failed to record duel stats:", e);
+      }
+    })();
+  }, [
+    phase,
+    user,
+    playerSeat,
+    thisPlayerIndex,
+    playerScores,
+    roomId,
+    rounds.length,
+    currentBreakerIndex,
+    currentPatcherIndex,
+  ]);
 
   // Build props for layout components
   const layoutProps: LayoutProps = {

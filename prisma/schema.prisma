@@ -1,5 +1,5 @@
 generator client {
-  provider     = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -15,7 +15,13 @@ model User {
   passwordHash String
   displayName  String
 
-  // ✅ optional 1:1 link to Player
+  // ✅ Logged-in stats (what you asked for)
+  totalScore   Int      @default(0)
+  duelsPlayed  Int      @default(0)
+  duelsWon     Int      @default(0)
+  duelsLost    Int      @default(0)
+
+  // ✅ optional 1:1 link to Player (device identity)
   playerId     String?  @unique
   player       Player?  @relation(fields: [playerId], references: [id], onDelete: SetNull)
 }
@@ -26,13 +32,15 @@ model Player {
   updatedAt   DateTime @updatedAt
 
   // ✅ device identity (what you currently call clientId)
-  clientId    String?   @unique
+  clientId    String?  @unique
 
   name        String
+
+  // If you still want “device stats” keep these;
+  // otherwise you can delete them and only use User stats.
   totalXp     Int      @default(0)
   duelsPlayed Int      @default(0)
   duelsWon    Int      @default(0)
 
-  // back-reference
   user        User?
 }

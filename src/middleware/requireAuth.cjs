@@ -1,19 +1,15 @@
-// src/middleware/requireAuth.js
-const { getTokenFromReq, verifyToken } = require("../utils/auth");
+// src/middleware/requireAuth.cjs
+const { getTokenFromReq, verifyToken } = require("../utils/auth.cjs");
 
 function requireAuth(req, res, next) {
   try {
     const token = getTokenFromReq(req);
-    if (!token) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
+    if (!token) return res.status(401).json({ error: "Not authenticated" });
 
-    const decoded = verifyToken(token); // { sub, email, ... }
-    // Put the JWT claims on the request
-    req.auth = decoded;
-
+    const decoded = verifyToken(token);
+    req.auth = decoded; // { sub, email, displayName, ... }
     return next();
-  } catch (err) {
+  } catch {
     return res.status(401).json({ error: "Invalid or expired session" });
   }
 }
