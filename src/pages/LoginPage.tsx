@@ -1,13 +1,14 @@
 // src/pages/LoginPage.tsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-const API_BASE = (import.meta as any).env?.VITE_API_URL ?? "";
+import { useAuth } from "../auth/AuthContext";
 
 type Mode = "login" | "register";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const { login, register } = useAuth();
+
   const [mode, setMode] = useState<Mode>("login");
 
   const [email, setEmail] = useState("");
@@ -78,34 +79,13 @@ const LoginPage: React.FC = () => {
 
     setLoading(true);
     try {
-      const endpoint = mode === "login" ? "/auth/login" : "/auth/register";
-
-      const body =
-        mode === "login"
-          ? { email: e, password }
-          : { email: e, password, displayName: displayName.trim() };
-
-      const res = await fetch(`${API_BASE}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        let msg = `Request failed (${res.status})`;
-        try {
-          const data = await res.json();
-          msg = data?.error || data?.message || msg;
-        } catch {
-          // ignore
-        }
-        throw new Error(msg);
+      if (mode === "login") {
+        await login(e, password);
+      } else {
+        await register(e, password, displayName.trim());
       }
 
-      // Optional: validate cookie works
-      await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
-
+      // ✅ AuthContext has setUser(), so UI updates immediately without refresh.
       navigate("/", { replace: true });
     } catch (err: any) {
       setError(err?.message || "Something went wrong.");
@@ -128,7 +108,9 @@ const LoginPage: React.FC = () => {
       <div style={cardStyle}>
         <h1 style={{ margin: 0, fontSize: 24 }}>RuleShift</h1>
         <p style={{ marginTop: 8, opacity: 0.85, fontSize: 13 }}>
-          {mode === "login" ? "Login to save stats across devices." : "Create an account to save stats."}
+          {mode === "login"
+            ? "Login to save stats across devices."
+            : "Create an account to save stats."}
         </p>
 
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -206,7 +188,11 @@ const LoginPage: React.FC = () => {
             </div>
           )}
 
-          <button style={{ ...buttonStyle, marginTop: 14 }} onClick={onSubmit} disabled={loading}>
+          <button
+            style={{ ...buttonStyle, marginTop: 14 }}
+            onClick={onSubmit}
+            disabled={loading}
+          >
             {loading ? "Working..." : mode === "login" ? "Login" : "Create Account"}
           </button>
 
