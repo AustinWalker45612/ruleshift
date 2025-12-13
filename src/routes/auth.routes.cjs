@@ -14,7 +14,6 @@ const {
 } = require("../utils/auth.cjs");
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 /**
  * POST /auth/register
