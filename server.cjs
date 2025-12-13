@@ -7,10 +7,10 @@ const { Server } = require("socket.io");
 require("dotenv").config();
 
 // ✅ Auth router (new)
-const { createAuthRouter } = require("./src/routes/auth.routes.js");
+const { createAuthRouter } = require("./src/routes/auth.routes.cjs");
 
 // Prisma setup
-const { PrismaClient } = require("./src/generated/client.js");
+const { PrismaClient } = require("./src/generated/client.cjs");
 const { Pool } = require("pg");
 const { PrismaPg } = require("@prisma/adapter-pg");
 
