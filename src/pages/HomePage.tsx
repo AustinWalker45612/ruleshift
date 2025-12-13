@@ -1,13 +1,7 @@
 // src/pages/HomePage.tsx
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-const API_BASE = (import.meta as any).env?.VITE_API_URL ?? "";
-
-type MeResponse =
-  | { user?: { displayName?: string; email?: string } }
-  | { displayName?: string }
-  | null;
+import { useAuth } from "../auth/AuthContext";
 
 const generateRoomId = (): string => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I/O/1/0
@@ -18,37 +12,9 @@ const generateRoomId = (): string => {
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { user, logout, isLoading } = useAuth();
+
   const [joinCode, setJoinCode] = useState("");
-
-  const [meName, setMeName] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadMe = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
-        if (!res.ok) {
-          if (!cancelled) setMeName(null);
-          return;
-        }
-        const data: MeResponse = await res.json();
-        const name =
-          (data as any)?.user?.displayName ??
-          (data as any)?.displayName ??
-          null;
-        if (!cancelled) setMeName(name ? String(name) : null);
-      } catch {
-        if (!cancelled) setMeName(null);
-      }
-    };
-
-    loadMe();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const canJoin = useMemo(() => joinCode.trim().length >= 4, [joinCode]);
 
@@ -102,7 +68,7 @@ export const HomePage: React.FC = () => {
     <div
       style={{
         minHeight: "100vh",
-        background: "#0f172a", // ✅ match global body background to remove the “border” effect
+        background: "#0f172a",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -122,7 +88,7 @@ export const HomePage: React.FC = () => {
           position: "relative",
         }}
       >
-        {/* Top right login */}
+        {/* Top right auth */}
         <div
           style={{
             position: "absolute",
@@ -133,17 +99,31 @@ export const HomePage: React.FC = () => {
             alignItems: "center",
           }}
         >
-          {meName ? (
-            <div style={{ fontSize: 12, opacity: 0.85 }}>
-              Logged in as <strong>{meName}</strong>
-            </div>
+          {isLoading ? (
+            <div style={{ fontSize: 12, opacity: 0.65 }}>Loading…</div>
+          ) : user ? (
+            <>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>
+                Logged in as <strong>{user.displayName}</strong>
+              </div>
+              <button
+                style={smallButtonStyle}
+                onClick={async () => {
+                  await logout();
+                  navigate("/");
+                }}
+              >
+                Logout
+              </button>
+            </>
           ) : (
-            <div style={{ fontSize: 12, opacity: 0.65 }}>Not logged in</div>
+            <>
+              <div style={{ fontSize: 12, opacity: 0.65 }}>Not logged in</div>
+              <button style={smallButtonStyle} onClick={() => navigate("/login")}>
+                Login
+              </button>
+            </>
           )}
-
-          <button style={smallButtonStyle} onClick={() => navigate("/login")}>
-            Login
-          </button>
         </div>
 
         <h1 style={{ margin: 0, fontSize: 28, paddingRight: 120 }}>RuleShift</h1>
