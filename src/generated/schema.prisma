@@ -8,12 +8,33 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email        String @unique
+  passwordHash String
+  displayName  String
+
+  // ✅ optional 1:1 link to Player
+  playerId String? @unique
+  player   Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)
+}
+
 model Player {
-  id          String   @id
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ✅ device identity (what you currently call clientId)
+  clientId String? @unique
+
   name        String
-  totalXp     Int      @default(0)
-  duelsPlayed Int      @default(0)
-  duelsWon    Int      @default(0)
+  totalXp     Int    @default(0)
+  duelsPlayed Int    @default(0)
+  duelsWon    Int    @default(0)
+
+  // back-reference
+  user User?
 }

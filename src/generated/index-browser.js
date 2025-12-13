@@ -120,10 +120,21 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
+exports.Prisma.UserScalarFieldEnum = {
+  id: 'id',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  email: 'email',
+  passwordHash: 'passwordHash',
+  displayName: 'displayName',
+  playerId: 'playerId'
+};
+
 exports.Prisma.PlayerScalarFieldEnum = {
   id: 'id',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
+  clientId: 'clientId',
   name: 'name',
   totalXp: 'totalXp',
   duelsPlayed: 'duelsPlayed',
@@ -140,8 +151,14 @@ exports.Prisma.QueryMode = {
   insensitive: 'insensitive'
 };
 
+exports.Prisma.NullsOrder = {
+  first: 'first',
+  last: 'last'
+};
+
 
 exports.Prisma.ModelName = {
+  User: 'User',
   Player: 'Player'
 };
 

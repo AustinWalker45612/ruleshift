@@ -93,10 +93,21 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
+exports.Prisma.UserScalarFieldEnum = {
+  id: 'id',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  email: 'email',
+  passwordHash: 'passwordHash',
+  displayName: 'displayName',
+  playerId: 'playerId'
+};
+
 exports.Prisma.PlayerScalarFieldEnum = {
   id: 'id',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
+  clientId: 'clientId',
   name: 'name',
   totalXp: 'totalXp',
   duelsPlayed: 'duelsPlayed',
@@ -113,8 +124,14 @@ exports.Prisma.QueryMode = {
   insensitive: 'insensitive'
 };
 
+exports.Prisma.NullsOrder = {
+  first: 'first',
+  last: 'last'
+};
+
 
 exports.Prisma.ModelName = {
+  User: 'User',
   Player: 'Player'
 };
 /**
@@ -125,10 +142,10 @@ const config = {
   "clientVersion": "7.1.0",
   "engineVersion": "ab635e6b9d606fa5c8fb8b1a7f909c3c3c1c98ba",
   "activeProvider": "postgresql",
-  "inlineSchema": "generator client {\n  provider     = \"prisma-client-js\"\n  output       = \"../src/generated\"\n  moduleFormat = \"cjs\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nmodel Player {\n  id          String   @id\n  createdAt   DateTime @default(now())\n  updatedAt   DateTime @updatedAt\n  name        String\n  totalXp     Int      @default(0)\n  duelsPlayed Int      @default(0)\n  duelsWon    Int      @default(0)\n}\n"
+  "inlineSchema": "generator client {\n  provider     = \"prisma-client-js\"\n  output       = \"../src/generated\"\n  moduleFormat = \"cjs\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nmodel User {\n  id        String   @id @default(cuid())\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  email        String @unique\n  passwordHash String\n  displayName  String\n\n  // ✅ optional 1:1 link to Player\n  playerId String? @unique\n  player   Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)\n}\n\nmodel Player {\n  id        String   @id @default(cuid())\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  // ✅ device identity (what you currently call clientId)\n  clientId String? @unique\n\n  name        String\n  totalXp     Int    @default(0)\n  duelsPlayed Int    @default(0)\n  duelsWon    Int    @default(0)\n\n  // back-reference\n  user User?\n}\n"
 }
 
-config.runtimeDataModel = JSON.parse("{\"models\":{\"Player\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"totalXp\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"duelsPlayed\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"duelsWon\",\"kind\":\"scalar\",\"type\":\"Int\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
+config.runtimeDataModel = JSON.parse("{\"models\":{\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"email\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"passwordHash\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"displayName\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"playerId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"player\",\"kind\":\"object\",\"type\":\"Player\",\"relationName\":\"PlayerToUser\"}],\"dbName\":null},\"Player\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"clientId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"totalXp\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"duelsPlayed\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"duelsWon\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"PlayerToUser\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
 defineDmmfProperty(exports.Prisma, config.runtimeDataModel)
 config.compilerWasm = {
       getRuntime: async () => require('./query_compiler_bg.js'),
