@@ -47,6 +47,7 @@ export const HomePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const canJoin = useMemo(() => joinCode.trim().length >= 4, [joinCode]);
@@ -101,7 +102,7 @@ export const HomePage: React.FC = () => {
     <div
       style={{
         minHeight: "100vh",
-        background: "#0b1220",
+        background: "#0f172a", // ✅ match global body background to remove the “border” effect
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -122,7 +123,16 @@ export const HomePage: React.FC = () => {
         }}
       >
         {/* Top right login */}
-        <div style={{ position: "absolute", top: 14, right: 14, display: "flex", gap: 10, alignItems: "center" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: 14,
+            right: 14,
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+          }}
+        >
           {meName ? (
             <div style={{ fontSize: 12, opacity: 0.85 }}>
               Logged in as <strong>{meName}</strong>
@@ -145,7 +155,15 @@ export const HomePage: React.FC = () => {
           <button style={buttonStyle} onClick={onCreateRoom}>
             Create New Room
           </button>
-          <p style={{ margin: "10px 0", opacity: 0.7, fontSize: 12, textAlign: "center" }}>
+
+          <p
+            style={{
+              margin: "10px 0",
+              opacity: 0.7,
+              fontSize: 12,
+              textAlign: "center",
+            }}
+          >
             or
           </p>
 
