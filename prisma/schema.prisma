@@ -1,3 +1,5 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -6,56 +8,47 @@ datasource db {
   provider = "postgresql"
 }
 
+enum DuelOutcome {
+  WIN
+  LOSS
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String
   displayName  String
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now())
 
-  // ✅ Logged-in stats (what you asked for)
-  totalScore  Int @default(0)
-  duelsPlayed Int @default(0)
-  duelsWon    Int @default(0)
-  duelsLost   Int @default(0)
-
-  // Relations
+  // ✅ Opposite side of DuelResult.user (fixes your P1012 error)
   duelResults DuelResult[]
-  players     Player[]
 }
 
 model Player {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  clientId   String   @unique
+  name       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  lastSeenAt DateTime @default(now())
 
-  // device identity (clientId)
-  clientId String? @unique
-
-  name String
-
-  // device stats (optional but kept)
-  totalXp     Int @default(0)
-  duelsPlayed Int @default(0)
-  duelsWon    Int @default(0)
-
-  // Relations
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-  userId String?
+  @@index([clientId])
 }
 
 model DuelResult {
-  id String @id @default(cuid())
-
-  // Relations
+  id     String @id @default(cuid())
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  scoreEarned Int
-  outcome     String
   duelKey     String
-  createdAt   DateTime @default(now())
+  outcome     DuelOutcome
+  scoreEarned Int
 
-  @@unique([duelKey])
+  createdAt DateTime @default(now())
+
+  // prevents duplicate inserts if the same duel completion is posted twice
+  @@unique([userId, duelKey])
   @@index([userId])
+  @@index([createdAt])
 }
