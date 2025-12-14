@@ -33,12 +33,7 @@ router.post("/duel/complete", requireAuth, async (req, res) => {
     // OPTION A (simple): store as a row in a DuelResult table (recommended)
     // If you don't have this model yet, skip to the "no-db-change" option below.
 
-    console.log("PRISMA IS:", !!prisma);
-    console.log("PRISMA KEYS:", prisma ? Object.keys(prisma).slice(0, 40) : null);
-    console.log("DUELRESULT IS:", prisma ? prisma.duelResult : null);
-
-
-    const created = await prisma.duelResult.create({
+    const created = await prisma.DuelResult.create({
       data: {
         userId: req.userId,
         duelKey,
