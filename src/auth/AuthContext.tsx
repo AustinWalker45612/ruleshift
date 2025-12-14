@@ -37,12 +37,12 @@ import React, {
   }
   
   function getApiBase(): string {
-    // In Vercel set: VITE_API_URL = https://ruleshift-backend.onrender.com
-    const base = (import.meta as any)?.env?.VITE_API_URL as string | undefined;
-    if (base && typeof base === "string") return base.replace(/\/+$/, "");
-    // Local fallback
+    // In production, call same-origin via Vercel rewrite (/api -> backend)
+    if ((import.meta as any)?.env?.PROD) return "/api";
+    // Local dev
     return "http://localhost:4000";
   }
+  
   
   export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<AuthUser | null>(null);

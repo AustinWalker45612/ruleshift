@@ -66,7 +66,13 @@ function getCookieOptions() {
 }
 
 function setAuthCookie(res, token) {
-  res.cookie(COOKIE_NAME, token, getCookieOptions());
+    res.cookie(AUTH_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: IS_PROD,        // true on https
+        sameSite: "lax",        // best for same-origin
+        path: "/",
+        maxAge: 1000 * 60 * 60 * 24 * 30
+      });      
 }
 
 function clearAuthCookie(res) {

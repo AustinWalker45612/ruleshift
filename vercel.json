@@ -1,9 +1,6 @@
 {
     "rewrites": [
-      {
-        "source": "/room/:path*",
-        "destination": "/"
-      }
+      { "source": "/api/(.*)", "destination": "https://ruleshift-backend.onrender.com/$1" }
     ]
   }
   
