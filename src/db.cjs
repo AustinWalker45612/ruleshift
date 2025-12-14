@@ -11,4 +11,6 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg(pool),
 });
 
+console.log("PRISMA duelResult exists?", !!prisma.duelResult);
+
 module.exports = { prisma, pool };
