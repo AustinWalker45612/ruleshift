@@ -13,6 +13,12 @@ model User {
   displayName  String
   createdAt    DateTime @default(now())
 
+  // ✅ Logged-in stats (what you asked for)
+  totalScore  Int @default(0)
+  duelsPlayed Int @default(0)
+  duelsWon    Int @default(0)
+  duelsLost   Int @default(0)
+
   // Relations
   duelResults DuelResult[]
   players     Player[]
