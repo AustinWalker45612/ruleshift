@@ -148,8 +148,6 @@ async function upsertPlayer({ clientId, name }) {
       clientId,                         // ✅ store device id here
       name,
       createdAt: now,
-      updatedAt: now,
-      lastSeenAt: now,
     },
   });
 }
