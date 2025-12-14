@@ -7,25 +7,14 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  email        String @unique
+  id           String   @id @default(cuid())
+  email        String   @unique
   passwordHash String
   displayName  String
+  createdAt    DateTime @default(now())
 
-  // ✅ Logged-in stats (what you asked for)
-  totalScore  Int @default(0)
-  duelsPlayed Int @default(0)
-  duelsWon    Int @default(0)
-  duelsLost   Int @default(0)
-
-  // ✅ optional 1:1 link to Player (device identity)
-  playerId String? @unique
-  player   Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)
-
-  duelResults DuelResult[] // ✅ add this line
+  duelResults DuelResult[] // ✅ required opposite relation
+  players     Player[]
 }
 
 model Player {
@@ -44,16 +33,16 @@ model Player {
   duelsPlayed Int @default(0)
   duelsWon    Int @default(0)
 
-  user User?
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String?
 }
 
 model DuelResult {
   id          String   @id @default(cuid())
   userId      String
-  duelKey     String   @unique
-  outcome     String
+  user        User     @relation(fields: [userId], references: [id])
   scoreEarned Int
+  outcome     String
+  duelKey     String
   createdAt   DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
 }
