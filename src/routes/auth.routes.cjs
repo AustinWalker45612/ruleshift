@@ -15,6 +15,9 @@ const {
 
 const router = express.Router();
 
+// 🔐 single source of truth for cookie name
+const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "rs_token";
+
 function makeTokenPayload(user) {
   return {
     sub: user.id,
@@ -23,6 +26,7 @@ function makeTokenPayload(user) {
   };
 }
 
+// ---------------- REGISTER ----------------
 router.post("/register", async (req, res) => {
   try {
     const email = String(req.body?.email || "").trim().toLowerCase();
@@ -34,6 +38,7 @@ router.post("/register", async (req, res) => {
         .status(400)
         .json({ error: "email, password, and displayName are required" });
     }
+
     if (password.length < 8) {
       return res
         .status(400)
@@ -41,7 +46,9 @@ router.post("/register", async (req, res) => {
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) return res.status(409).json({ error: "Email already in use" });
+    if (existing) {
+      return res.status(409).json({ error: "Email already in use" });
+    }
 
     const passwordHash = await hashPassword(password);
 
@@ -49,9 +56,10 @@ router.post("/register", async (req, res) => {
       data: { email, passwordHash, displayName },
     });
 
-    // ✅ IMPORTANT: sign a payload with sub
     const token = signToken(makeTokenPayload(user));
-    setAuthCookie(res, token);
+
+    // ✅ FIX: pass cookie name explicitly
+    setAuthCookie(res, token, AUTH_COOKIE_NAME);
 
     return res.status(201).json({ user: sanitizeUser(user) });
   } catch (err) {
@@ -60,6 +68,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
+// ---------------- LOGIN ----------------
 router.post("/login", async (req, res) => {
   try {
     const email = String(req.body?.email || "").trim().toLowerCase();
@@ -69,16 +78,20 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "email and password are required" });
     }
 
-    // include passwordHash for verification
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    if (!user) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
 
     const ok = await verifyPassword(password, user.passwordHash);
-    if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+    if (!ok) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
 
-    // ✅ IMPORTANT: sign a payload with sub
     const token = signToken(makeTokenPayload(user));
-    setAuthCookie(res, token);
+
+    // ✅ FIX: pass cookie name explicitly
+    setAuthCookie(res, token, AUTH_COOKIE_NAME);
 
     return res.status(200).json({ user: sanitizeUser(user) });
   } catch (err) {
@@ -87,28 +100,31 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// ---------------- ME ----------------
 router.get("/me", async (req, res) => {
   try {
     const token = getTokenFromReq(req);
-    if (!token) return res.status(401).json({ user: null });
+    if (!token) {
+      return res.status(401).json({ user: null });
+    }
 
     let decoded;
     try {
       decoded = verifyToken(token);
     } catch {
-      clearAuthCookie(res);
+      clearAuthCookie(res, AUTH_COOKIE_NAME);
       return res.status(401).json({ user: null });
     }
 
     const userId = decoded?.sub;
     if (!userId) {
-      clearAuthCookie(res);
+      clearAuthCookie(res, AUTH_COOKIE_NAME);
       return res.status(401).json({ user: null });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      clearAuthCookie(res);
+      clearAuthCookie(res, AUTH_COOKIE_NAME);
       return res.status(401).json({ user: null });
     }
 
@@ -119,8 +135,9 @@ router.get("/me", async (req, res) => {
   }
 });
 
+// ---------------- LOGOUT ----------------
 router.post("/logout", (_req, res) => {
-  clearAuthCookie(res);
+  clearAuthCookie(res, AUTH_COOKIE_NAME);
   return res.status(200).json({ ok: true });
 });
 

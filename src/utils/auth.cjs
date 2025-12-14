@@ -65,15 +65,19 @@ function getCookieOptions() {
   };
 }
 
-function setAuthCookie(res, token) {
-    res.cookie(AUTH_COOKIE_NAME, token, {
-        httpOnly: true,
-        secure: IS_PROD,        // true on https
-        sameSite: "lax",        // best for same-origin
-        path: "/",
-        maxAge: 1000 * 60 * 60 * 24 * 30
-      });      
-}
+// src/utils/auth.cjs
+function setAuthCookie(res, token, cookieName) {
+    res.cookie(cookieName, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 1000 * 60 * 60 * 24 * 30,
+    });
+  }
+  
+  module.exports = { setAuthCookie };
+  
 
 function clearAuthCookie(res) {
   res.clearCookie(COOKIE_NAME, {
