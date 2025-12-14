@@ -149,9 +149,7 @@ async function upsertPlayer({ clientId, name }) {
       name,
       createdAt: now,
       updatedAt: now,
-      duelsPlayed: 0,
-      duelsWon: 0,
-      totalXp: 0,
+      lastSeenAt: now,
     },
   });
 }
