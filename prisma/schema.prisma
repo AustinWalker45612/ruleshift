@@ -21,6 +21,10 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now())
 
+  // ✅ optional 1:1 link to Player (device identity)
+  playerId String? @unique
+  player   Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
   // ✅ Opposite side of DuelResult.user (fixes your P1012 error)
   duelResults DuelResult[]
 }
@@ -32,6 +36,8 @@ model Player {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   lastSeenAt DateTime @default(now())
+
+  user User?
 
   @@index([clientId])
 }
