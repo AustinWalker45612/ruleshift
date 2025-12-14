@@ -8,6 +8,7 @@ require("dotenv").config();
 
 // ✅ Auth router (new)
 const { authRouter } = require("./src/routes/auth.routes.cjs");
+const { statsRouter } = require("./routes/stats.routes.cjs");
 
 const { prisma, pool } = require("./src/db.cjs");
 
@@ -43,6 +44,7 @@ app.get("/health", (req, res) => {
 
 // ✅ Mount auth routes (/auth/register, /auth/login, /auth/me, /auth/logout)
 app.use("/auth", authRouter);
+app.use("/stats", statsRouter);
 
 // -------------------- HTTP server (Express + Socket.IO) --------------------
 const server = http.createServer(app);

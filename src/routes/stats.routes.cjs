@@ -1,61 +1,54 @@
 // src/routes/stats.routes.cjs
 const express = require("express");
 const { prisma } = require("../db.cjs");
-const { requireAuth } = require("../middleware/requireAuth.cjs");
+const { getTokenFromReq, verifyToken } = require("../utils/auth.cjs");
 
 const router = express.Router();
 
-/**
- * Body:
- * {
- *   scoreEarned: number,  // points this logged-in user earned this duel
- *   outcome: "WIN" | "LOSS",
- *   duelKey?: string      // optional idempotency key from client
- * }
- */
+function requireAuth(req, res, next) {
+  const token = getTokenFromReq(req);
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const decoded = verifyToken(token);
+    req.userId = decoded?.sub;
+    if (!req.userId) return res.status(401).json({ error: "Unauthorized" });
+    next();
+  } catch {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+}
+
+// POST /stats/duel/complete
 router.post("/duel/complete", requireAuth, async (req, res) => {
   try {
-    const userId = req.auth?.sub;
-    if (!userId) return res.status(401).json({ error: "Not authenticated" });
+    const { scoreEarned, outcome, duelKey } = req.body || {};
 
-    const scoreEarnedRaw = req.body?.scoreEarned;
-    const outcome = String(req.body?.outcome || "").toUpperCase();
-    const duelKey = String(req.body?.duelKey || "").trim();
+    if (!duelKey) return res.status(400).json({ error: "Missing duelKey" });
+    if (outcome !== "WIN" && outcome !== "LOSS")
+      return res.status(400).json({ error: "Invalid outcome" });
 
-    const scoreEarned = Number(scoreEarnedRaw);
-    if (!Number.isFinite(scoreEarned) || scoreEarned < 0) {
-      return res.status(400).json({ error: "scoreEarned must be a number >= 0" });
-    }
-    if (outcome !== "WIN" && outcome !== "LOSS") {
-      return res.status(400).json({ error: 'outcome must be "WIN" or "LOSS"' });
-    }
+    const score = Number(scoreEarned || 0);
 
-    // ✅ Minimal idempotency (optional but helpful):
-    // If you want this to be real, you should store duelKey server-side in a DuelResult table.
-    // For now, we just accept it and let client handle "call once".
-    // (Keeping it lightweight to match your current setup.)
+    // OPTION A (simple): store as a row in a DuelResult table (recommended)
+    // If you don't have this model yet, skip to the "no-db-change" option below.
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
+    const created = await prisma.duelResult.create({
       data: {
-        totalScore: { increment: Math.floor(scoreEarned) },
-        duelsPlayed: { increment: 1 },
-        duelsWon: outcome === "WIN" ? { increment: 1 } : undefined,
-        duelsLost: outcome === "LOSS" ? { increment: 1 } : undefined,
-      },
-      select: {
-        id: true,
-        displayName: true,
-        totalScore: true,
-        duelsPlayed: true,
-        duelsWon: true,
-        duelsLost: true,
+        userId: req.userId,
+        duelKey,
+        outcome,
+        scoreEarned: score,
       },
     });
 
-    return res.status(200).json({ ok: true, user: updated, duelKey: duelKey || null });
+    return res.status(200).json({ ok: true, id: created.id });
   } catch (err) {
-    console.error("stats duel/complete error:", err);
+    // If duelKey is unique and already exists, avoid crashing the client
+    // (Prisma P2002 unique constraint)
+    if (err?.code === "P2002") return res.status(200).json({ ok: true, dup: true });
+
+    console.error("stats/duel/complete error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 });

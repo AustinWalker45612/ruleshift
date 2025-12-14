@@ -7,40 +7,53 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  email        String   @unique
+  email        String @unique
   passwordHash String
   displayName  String
 
   // ✅ Logged-in stats (what you asked for)
-  totalScore   Int      @default(0)
-  duelsPlayed  Int      @default(0)
-  duelsWon     Int      @default(0)
-  duelsLost    Int      @default(0)
+  totalScore  Int @default(0)
+  duelsPlayed Int @default(0)
+  duelsWon    Int @default(0)
+  duelsLost   Int @default(0)
 
   // ✅ optional 1:1 link to Player (device identity)
-  playerId     String?  @unique
-  player       Player?  @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  playerId String? @unique
+  player   Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  duelResults DuelResult[] // ✅ add this line
 }
 
 model Player {
-  id          String   @id @default(cuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // ✅ device identity (what you currently call clientId)
-  clientId    String?  @unique
+  clientId String? @unique
 
-  name        String
+  name String
 
   // If you still want “device stats” keep these;
   // otherwise you can delete them and only use User stats.
-  totalXp     Int      @default(0)
-  duelsPlayed Int      @default(0)
-  duelsWon    Int      @default(0)
+  totalXp     Int @default(0)
+  duelsPlayed Int @default(0)
+  duelsWon    Int @default(0)
 
-  user        User?
+  user User?
+}
+
+model DuelResult {
+  id          String   @id @default(cuid())
+  userId      String
+  duelKey     String   @unique
+  outcome     String
+  scoreEarned Int
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
 }
