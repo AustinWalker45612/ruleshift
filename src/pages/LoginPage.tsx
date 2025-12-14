@@ -10,7 +10,6 @@ const LoginPage: React.FC = () => {
   const { login, register } = useAuth();
 
   const [mode, setMode] = useState<Mode>("login");
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -80,12 +79,11 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     try {
       if (mode === "login") {
-        await login(e, password);
+        await login(e, password); // ✅ updates AuthContext immediately
       } else {
-        await register(e, password, displayName.trim());
+        await register(e, password, displayName.trim()); // ✅ updates immediately
       }
 
-      // ✅ AuthContext has setUser(), so UI updates immediately without refresh.
       navigate("/", { replace: true });
     } catch (err: any) {
       setError(err?.message || "Something went wrong.");

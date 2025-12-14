@@ -22,7 +22,11 @@ import React, {
   
     refreshMe: () => Promise<void>;
     login: (email: string, password: string) => Promise<void>;
-    register: (email: string, password: string, displayName: string) => Promise<void>;
+    register: (
+      email: string,
+      password: string,
+      displayName: string
+    ) => Promise<void>;
     logout: () => Promise<void>;
   };
   
@@ -37,18 +41,19 @@ import React, {
   }
   
   function getApiBase(): string {
-    // In production, call same-origin via Vercel rewrite (/api -> backend)
-    if ((import.meta as any)?.env?.PROD) return "/api";
+    // Production: same-origin via Vercel /api routes
+    if (import.meta.env.PROD) return "/api";
     // Local dev
     return "http://localhost:4000";
   }
   
-  
-  export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+    children,
+  }) => {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
   
-    // Incrementing token to prevent stale responses overwriting newer auth state
+    // Prevent stale responses overwriting newer auth state
     const authOpIdRef = useRef(0);
   
     const isAuthenticated = !!user;
@@ -65,7 +70,6 @@ import React, {
   
       const data = await safeJson(res);
   
-      // If a newer auth op happened while this request was in-flight, ignore this response.
       if (opId !== authOpIdRef.current) return;
   
       if (!res.ok) {
@@ -102,44 +106,41 @@ import React, {
       const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         credentials: "include",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
   
       const data = await safeJson(res);
   
-      if (!res.ok) {
-        throw new Error(data?.error || "Login failed.");
-      }
-      if (!data?.user) {
-        throw new Error("Invalid login response.");
-      }
+      if (!res.ok) throw new Error(data?.error || "Login failed.");
+      if (!data?.user) throw new Error("Invalid login response.");
   
-      // only apply if still latest op
       if (opId !== authOpIdRef.current) return;
   
       setUser(data.user as AuthUser);
     };
   
-    const register = async (email: string, password: string, displayName: string) => {
+    const register = async (
+      email: string,
+      password: string,
+      displayName: string
+    ) => {
       const API = getApiBase();
       const opId = ++authOpIdRef.current;
   
       const res = await fetch(`${API}/auth/register`, {
         method: "POST",
         credentials: "include",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, displayName }),
       });
   
       const data = await safeJson(res);
   
-      if (!res.ok) {
-        throw new Error(data?.error || "Registration failed.");
-      }
-      if (!data?.user) {
-        throw new Error("Invalid registration response.");
-      }
+      if (!res.ok) throw new Error(data?.error || "Registration failed.");
+      if (!data?.user) throw new Error("Invalid registration response.");
   
       if (opId !== authOpIdRef.current) return;
   
@@ -153,6 +154,7 @@ import React, {
       await fetch(`${API}/auth/logout`, {
         method: "POST",
         credentials: "include",
+        cache: "no-store",
       }).catch(() => {});
   
       if (opId !== authOpIdRef.current) return;
