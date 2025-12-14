@@ -8,7 +8,7 @@ require("dotenv").config();
 
 // ✅ Auth router (new)
 const { authRouter } = require("./src/routes/auth.routes.cjs");
-const { statsRouter } = require("./routes/stats.routes.cjs");
+const { statsRouter } = require("./src/routes/stats.routes.cjs");
 
 const { prisma, pool } = require("./src/db.cjs");
 
