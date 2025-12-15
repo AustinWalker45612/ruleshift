@@ -15,7 +15,7 @@ const {
 
 const router = express.Router();
 
-// 🔐 single source of truth for cookie name
+// 🔐 single source of truth for cookie name and you know
 const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "rs_token";
 
 function makeTokenPayload(user) {
