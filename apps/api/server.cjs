@@ -16,6 +16,11 @@ console.log("DATABASE_URL host:", (process.env.DATABASE_URL || "").split("@")[1]
 
 const { prisma, pool } = require("./src/db.cjs");
 
+prisma.$connect()
+  .then(() => console.log("✅ Prisma connected to DB"))
+  .catch((e) => console.error("❌ Prisma failed to connect:", e));
+
+
 // -------------------- Config --------------------
 const PORT = process.env.PORT || 4000;
 const DISCONNECT_GRACE_MS = 60 * 1000;
