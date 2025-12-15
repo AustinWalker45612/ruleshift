@@ -8,7 +8,8 @@ const cookieParser = require("cookie-parser");
 const { Server } = require("socket.io");
 
 // -------------------- Database --------------------
-const { prisma, pool } = require("./src/db.cjs");
+// ✅ If you switched to the "standard PrismaClient" db.cjs, it exports ONLY { prisma }
+const { prisma } = require("./src/db.cjs");
 
 // -------------------- Routers --------------------
 const { authRouter } = require("./src/routes/auth.routes.cjs");
@@ -16,8 +17,7 @@ const { statsRouter } = require("./src/routes/stats.routes.cjs");
 
 // -------------------- Config --------------------
 const PORT = process.env.PORT || 10000;
-const CLIENT_ORIGIN =
-  process.env.CLIENT_ORIGIN || "http://localhost:5173";
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
 
 const DISCONNECT_GRACE_MS = 60 * 1000;
 const ROOM_EXPIRY_MS = 60 * 60 * 1000;
@@ -67,12 +67,25 @@ function getOrCreateRoom(roomId) {
       roomId,
       state: null,
       seats: [
-        { clientId: null, socketId: null, connected: false, disconnectTimer: null, guestName: null },
-        { clientId: null, socketId: null, connected: false, disconnectTimer: null, guestName: null },
+        {
+          clientId: null,
+          socketId: null,
+          connected: false,
+          disconnectTimer: null,
+          guestName: null,
+        },
+        {
+          clientId: null,
+          socketId: null,
+          connected: false,
+          disconnectTimer: null,
+          guestName: null,
+        },
       ],
-      spectators: new Map(),
+      spectators: new Map(), // clientId -> { socketId, connected, guestName }
       lastActivity: Date.now(),
     };
+
     rooms.set(roomId, room);
     console.log(`Room created: ${roomId}`);
   } else {
@@ -92,7 +105,7 @@ function broadcastPresence(roomId) {
       seatIndex: index,
       occupied: !!seat.clientId,
       clientId: seat.clientId,
-      connected: seat.connected,
+      connected: !!seat.connected,
     })),
     spectatorsCount: room.spectators.size,
   });
@@ -100,13 +113,16 @@ function broadcastPresence(roomId) {
 
 setInterval(() => {
   const now = Date.now();
+
   for (const [roomId, room] of rooms.entries()) {
     const anyConnected =
       room.seats.some((s) => s.connected) ||
       [...room.spectators.values()].some((s) => s.connected);
 
     if (!anyConnected && now - room.lastActivity > ROOM_EXPIRY_MS) {
-      room.seats.forEach((s) => s.disconnectTimer && clearTimeout(s.disconnectTimer));
+      room.seats.forEach(
+        (s) => s.disconnectTimer && clearTimeout(s.disconnectTimer)
+      );
       rooms.delete(roomId);
       console.log(`Room expired: ${roomId}`);
     }
@@ -117,10 +133,14 @@ setInterval(() => {
 async function upsertPlayer({ clientId, name }) {
   if (!clientId || !name) return null;
 
+  const cleanClientId = String(clientId).trim();
+  const cleanName = String(name).trim();
+  if (!cleanClientId || !cleanName) return null;
+
   return prisma.player.upsert({
-    where: { clientId },
-    update: { name },
-    create: { clientId, name },
+    where: { clientId: cleanClientId },
+    update: { name: cleanName },
+    create: { clientId: cleanClientId, name: cleanName },
   });
 }
 
@@ -131,30 +151,48 @@ io.on("connection", (socket) => {
   socket.on("room:join", (payload) => {
     if (!payload?.roomId || !payload?.clientId) return;
 
-    const roomId = String(payload.roomId).toUpperCase();
+    const roomId = String(payload.roomId).toUpperCase().trim();
     const clientId = String(payload.clientId).trim();
-    const guestName = payload.guestName?.trim() || null;
+    const guestName =
+      typeof payload.guestName === "string" ? payload.guestName.trim() : null;
 
     const room = getOrCreateRoom(roomId);
     socket.join(roomId);
 
-    let seatIndex = room.seats.findIndex((s) => s.clientId === clientId);
-    if (seatIndex === -1) {
-      seatIndex = room.seats.findIndex((s) => !s.clientId);
-    }
+    // If they were a spectator before, drop that record (we'll re-add if needed).
+    if (room.spectators.has(clientId)) room.spectators.delete(clientId);
 
+    // Try to reattach existing seat first (prevents seat swap on refresh)
+    let seatIndex = room.seats.findIndex((s) => s.clientId === clientId);
+
+    // Otherwise take empty seat
+    if (seatIndex === -1) seatIndex = room.seats.findIndex((s) => !s.clientId);
+
+    // No seats available -> spectator
     if (seatIndex === -1) {
-      room.spectators.set(clientId, { socketId: socket.id, connected: true, guestName });
+      room.spectators.set(clientId, {
+        socketId: socket.id,
+        connected: true,
+        guestName: guestName || null,
+      });
+
       socket.emit("room:joined", { roomId, clientId, seatIndex: null });
       broadcastPresence(roomId);
       return;
     }
 
+    // Assign seat
     const seat = room.seats[seatIndex];
     seat.clientId = clientId;
     seat.socketId = socket.id;
     seat.connected = true;
-    seat.guestName = guestName;
+    seat.guestName = guestName || seat.guestName || null;
+
+    // Clear any pending disconnect cleanup
+    if (seat.disconnectTimer) {
+      clearTimeout(seat.disconnectTimer);
+      seat.disconnectTimer = null;
+    }
 
     socket.emit("room:joined", { roomId, clientId, seatIndex });
     broadcastPresence(roomId);
@@ -170,41 +208,63 @@ io.on("connection", (socket) => {
 
   socket.on("game:state", (payload) => {
     if (!payload?.roomId) return;
-    const roomId = String(payload.roomId).toUpperCase();
+
+    const roomId = String(payload.roomId).toUpperCase().trim();
     const room = getOrCreateRoom(roomId);
 
-    room.state = { ...payload, sender: undefined };
+    const cleanState = { ...payload };
+    delete cleanState.sender;
+
+    room.state = cleanState;
     room.lastActivity = Date.now();
 
-    socket.to(roomId).emit("game:state", {
-      ...payload,
-      sender: socket.id,
-    });
+    socket.to(roomId).emit("game:state", { ...payload, sender: socket.id });
   });
 
   socket.on("game:requestState", ({ roomId }) => {
-    const room = rooms.get(String(roomId).toUpperCase());
+    if (!roomId) return;
+    const room = rooms.get(String(roomId).toUpperCase().trim());
     if (room?.state) socket.emit("game:state", room.state);
   });
 
   socket.on("disconnect", () => {
     for (const [roomId, room] of rooms.entries()) {
+      // seats
       room.seats.forEach((seat, idx) => {
         if (seat.socketId === socket.id) {
           seat.connected = false;
           seat.socketId = null;
+
+          if (seat.disconnectTimer) clearTimeout(seat.disconnectTimer);
+
           seat.disconnectTimer = setTimeout(() => {
-            if (!seat.connected) {
-              room.seats[idx] = { clientId: null, socketId: null, connected: false, disconnectTimer: null, guestName: null };
+            const latest = rooms.get(roomId);
+            if (!latest) return;
+
+            const s = latest.seats[idx];
+            if (!s) return;
+
+            if (!s.connected) {
+              latest.seats[idx] = {
+                clientId: null,
+                socketId: null,
+                connected: false,
+                disconnectTimer: null,
+                guestName: null,
+              };
               broadcastPresence(roomId);
             }
           }, DISCONNECT_GRACE_MS);
         }
       });
 
+      // spectators
       for (const [cid, spec] of room.spectators.entries()) {
         if (spec.socketId === socket.id) room.spectators.delete(cid);
       }
+
+      room.lastActivity = Date.now();
+      broadcastPresence(roomId);
     }
   });
 });
@@ -212,8 +272,9 @@ io.on("connection", (socket) => {
 // -------------------- Shutdown --------------------
 async function shutdown() {
   console.log("Shutting down...");
-  await prisma.$disconnect().catch(() => {});
-  await pool.end().catch(() => {});
+  try {
+    await prisma.$disconnect();
+  } catch {}
   process.exit(0);
 }
 
