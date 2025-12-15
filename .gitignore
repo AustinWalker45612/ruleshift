@@ -27,5 +27,14 @@ node_modules
 dist
 .env
 
+src/generated
+**/src/generated
 
 /src/generated/prisma
+
+apps/api/.env
+apps/api/.env.*
+
+apps/web/.env
+apps/web/.env.*
+

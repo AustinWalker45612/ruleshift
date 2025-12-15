@@ -1,7 +1,7 @@
 // scripts/testPrisma.cjs
 require("dotenv/config");
 
-const { PrismaClient } = require("../src/generated"); // 👈 NOTE: no .cjs
+const { PrismaClient } = require("../apps/web/src/generated"); // 👈 NOTE: no .cjs
 const { Pool } = require("pg");
 const { PrismaPg } = require("@prisma/adapter-pg");
 
