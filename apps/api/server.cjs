@@ -10,15 +10,9 @@ require("dotenv").config();
 const { authRouter } = require("./src/routes/auth.routes.cjs");
 const { statsRouter } = require("./src/routes/stats.routes.cjs");
 
-console.log("DATABASE_URL present?", !!process.env.DATABASE_URL);
-console.log("DATABASE_URL host:", (process.env.DATABASE_URL || "").split("@")[1]?.split("/")[0]);
-
 
 const { prisma, pool } = require("./src/db.cjs");
 
-prisma.$connect()
-  .then(() => console.log("✅ Prisma connected to DB"))
-  .catch((e) => console.error("❌ Prisma failed to connect:", e));
 
 
 // -------------------- Config --------------------
