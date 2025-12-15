@@ -1,5 +1,5 @@
 // src/middleware/requireAuth.cjs
-const { getTokenFromReq, verifyToken } = require("../../apps/web/src/utils/auth.cjs");
+const { getTokenFromReq, verifyToken } = require("./src/utils/auth.cjs");
 
 function requireAuth(req, res, next) {
   try {
