@@ -2,7 +2,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// 🔒 Cookie name (must match frontend expectations)
+// -------------------- Constants --------------------
 const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "rs_token";
 
 // -------------------- JWT helpers --------------------
@@ -29,30 +29,21 @@ function verifyToken(token) {
 function getCookieOptions() {
   const isProd = process.env.NODE_ENV === "production";
 
-  /**
-   * Cross-site cookies (Vercel frontend + Render backend):
-   *   sameSite: "none"
-   *   secure: true
-   *
-   * Local dev:
-   *   sameSite: "lax"
-   *   secure: false
-   */
+  // Cross-site (Vercel → Render) requires:
+  //   sameSite: "none"
+  //   secure: true
   const sameSite =
-    process.env.AUTH_COOKIE_SAMESITE ||
+    process.env.AUTH_COOKIE_SAMESITE ??
     (isProd ? "none" : "lax");
 
   const secure =
-    process.env.AUTH_COOKIE_SECURE === "true"
-      ? true
-      : process.env.AUTH_COOKIE_SECURE === "false"
-      ? false
+    process.env.AUTH_COOKIE_SECURE !== undefined
+      ? process.env.AUTH_COOKIE_SECURE === "true"
       : isProd;
 
-  // ⚠️ Browsers REQUIRE secure=true if sameSite="none"
   if (sameSite === "none" && !secure) {
     console.warn(
-      "[auth] sameSite='none' without secure=true will break cookies"
+      "[auth] sameSite='none' requires secure=true or cookies WILL be blocked"
     );
   }
 
@@ -65,19 +56,9 @@ function getCookieOptions() {
   };
 }
 
-// src/utils/auth.cjs
-function setAuthCookie(res, token, cookieName) {
-    res.cookie(cookieName, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 1000 * 60 * 60 * 24 * 30,
-    });
-  }
-  
-  module.exports = { setAuthCookie };
-  
+function setAuthCookie(res, token) {
+  res.cookie(COOKIE_NAME, token, getCookieOptions());
+}
 
 function clearAuthCookie(res) {
   res.clearCookie(COOKIE_NAME, {
@@ -87,7 +68,7 @@ function clearAuthCookie(res) {
 }
 
 function getTokenFromReq(req) {
-  // requires cookie-parser middleware
+  // Requires cookie-parser middleware
   return req?.cookies?.[COOKIE_NAME] || null;
 }
 

@@ -38,7 +38,7 @@ export const HomePage: React.FC = () => {
     border: "1px solid #374151",
     background: "#020617",
     color: "#e5e7eb",
-    fontSize: 16, // prevents iOS zoom
+    fontSize: 16,
     letterSpacing: 2,
   };
 
@@ -106,6 +106,15 @@ export const HomePage: React.FC = () => {
               <div style={{ fontSize: 12, opacity: 0.85 }}>
                 Logged in as <strong>{user.displayName}</strong>
               </div>
+
+              {/* Profile button */}
+              <button
+                style={smallButtonStyle}
+                onClick={() => navigate("/profile")}
+              >
+                Profile
+              </button>
+
               <button
                 style={smallButtonStyle}
                 onClick={async () => {
@@ -126,7 +135,9 @@ export const HomePage: React.FC = () => {
           )}
         </div>
 
-        <h1 style={{ margin: 0, fontSize: 28, paddingRight: 120 }}>RuleShift</h1>
+        <h1 style={{ margin: 0, fontSize: 28, paddingRight: 160 }}>
+          RuleShift
+        </h1>
         <p style={{ marginTop: 8, opacity: 0.9, fontSize: 14 }}>
           A two-player duel: one patches the rules, the other breaks the code.
         </p>
