@@ -1,12 +1,13 @@
-// src/db.cjs
+// apps/api/src/db.cjs
+require("dotenv").config();
+const { Pool } = require("pg");
+const { PrismaPg } = require("@prisma/adapter-pg");
 const { PrismaClient } = require("@prisma/client");
 
-const url = process.env.DATABASE_URL || "";
-console.log("DATABASE_URL present?", !!url);
-if (url) console.log("DATABASE_URL (masked):", url.replace(/:(.*?)@/, ":***@"));
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const prisma = new PrismaClient({
-  datasourceUrl: url, // ✅ Prisma v7 expects this if schema doesn't contain datasource url
+  adapter: new PrismaPg(pool),
 });
 
-module.exports = { prisma };
+module.exports = { prisma, pool };

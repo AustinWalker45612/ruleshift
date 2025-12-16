@@ -8,8 +8,8 @@ const cookieParser = require("cookie-parser");
 const { Server } = require("socket.io");
 
 // -------------------- Database --------------------
-// ✅ If you switched to the "standard PrismaClient" db.cjs, it exports ONLY { prisma }
-const { prisma } = require("./src/db.cjs");
+// ✅ Adapter setup should export { prisma, pool }
+const { prisma, pool } = require("./src/db.cjs");
 
 // -------------------- Routers --------------------
 const { authRouter } = require("./src/routes/auth.routes.cjs");
@@ -67,20 +67,8 @@ function getOrCreateRoom(roomId) {
       roomId,
       state: null,
       seats: [
-        {
-          clientId: null,
-          socketId: null,
-          connected: false,
-          disconnectTimer: null,
-          guestName: null,
-        },
-        {
-          clientId: null,
-          socketId: null,
-          connected: false,
-          disconnectTimer: null,
-          guestName: null,
-        },
+        { clientId: null, socketId: null, connected: false, disconnectTimer: null, guestName: null },
+        { clientId: null, socketId: null, connected: false, disconnectTimer: null, guestName: null },
       ],
       spectators: new Map(), // clientId -> { socketId, connected, guestName }
       lastActivity: Date.now(),
@@ -120,9 +108,7 @@ setInterval(() => {
       [...room.spectators.values()].some((s) => s.connected);
 
     if (!anyConnected && now - room.lastActivity > ROOM_EXPIRY_MS) {
-      room.seats.forEach(
-        (s) => s.disconnectTimer && clearTimeout(s.disconnectTimer)
-      );
+      room.seats.forEach((s) => s.disconnectTimer && clearTimeout(s.disconnectTimer));
       rooms.delete(roomId);
       console.log(`Room expired: ${roomId}`);
     }
@@ -139,7 +125,7 @@ async function upsertPlayer({ clientId, name }) {
 
   return prisma.player.upsert({
     where: { clientId: cleanClientId },
-    update: { name: cleanName },
+    update: { name: cleanName, lastSeenAt: new Date() },
     create: { clientId: cleanClientId, name: cleanName },
   });
 }
@@ -176,6 +162,7 @@ io.on("connection", (socket) => {
         guestName: guestName || null,
       });
 
+      room.lastActivity = Date.now();
       socket.emit("room:joined", { roomId, clientId, seatIndex: null });
       broadcastPresence(roomId);
       return;
@@ -194,6 +181,7 @@ io.on("connection", (socket) => {
       seat.disconnectTimer = null;
     }
 
+    room.lastActivity = Date.now();
     socket.emit("room:joined", { roomId, clientId, seatIndex });
     broadcastPresence(roomId);
   });
@@ -229,6 +217,8 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     for (const [roomId, room] of rooms.entries()) {
+      let changed = false;
+
       // seats
       room.seats.forEach((seat, idx) => {
         if (seat.socketId === socket.id) {
@@ -252,28 +242,54 @@ io.on("connection", (socket) => {
                 disconnectTimer: null,
                 guestName: null,
               };
+              latest.lastActivity = Date.now();
               broadcastPresence(roomId);
             }
           }, DISCONNECT_GRACE_MS);
+
+          changed = true;
         }
       });
 
       // spectators
       for (const [cid, spec] of room.spectators.entries()) {
-        if (spec.socketId === socket.id) room.spectators.delete(cid);
+        if (spec.socketId === socket.id) {
+          room.spectators.delete(cid);
+          changed = true;
+        }
       }
 
-      room.lastActivity = Date.now();
-      broadcastPresence(roomId);
+      if (changed) {
+        room.lastActivity = Date.now();
+        broadcastPresence(roomId);
+      }
     }
   });
 });
+
+// -------------------- Startup DB Sanity Check --------------------
+async function sanityCheckDb() {
+  try {
+    // pool check
+    await pool.query("SELECT 1");
+    console.log("✅ pg Pool can query DB");
+
+    // prisma check
+    await prisma.$queryRaw`SELECT 1`;
+    console.log("✅ Prisma can query DB");
+  } catch (err) {
+    console.error("❌ DB sanity check failed:", err);
+  }
+}
 
 // -------------------- Shutdown --------------------
 async function shutdown() {
   console.log("Shutting down...");
   try {
     await prisma.$disconnect();
+  } catch {}
+  try {
+    await pool.end();
   } catch {}
   process.exit(0);
 }
@@ -282,7 +298,8 @@ process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 // -------------------- Listen --------------------
-server.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, "0.0.0.0", async () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`CORS origin: ${CLIENT_ORIGIN}`);
+  await sanityCheckDb();
 });
