@@ -4,12 +4,12 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "start": "node server.cjs",
-    "dev": "nodemon server.cjs",
-    "postinstall": "prisma generate",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy"
+  "start": "node server.cjs",
+  "dev": "nodemon server.cjs",
+  "prisma:generate": "prisma generate",
+  "prisma:migrate": "prisma migrate deploy"
   },
+
   "dependencies": {
     "@prisma/client": "^7.1.0",
     "bcryptjs": "^3.0.3",
