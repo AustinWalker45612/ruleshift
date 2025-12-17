@@ -1,186 +1,124 @@
 // src/auth/AuthContext.tsx
-import React, {
-    createContext,
-    useContext,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-  } from "react";
-  
-  type AuthUser = {
-    id: string;
-    email: string;
-    displayName: string;
-    createdAt?: string;
-  };
-  
-  type AuthContextValue = {
-    user: AuthUser | null;
-    isLoading: boolean;
-    isAuthenticated: boolean;
-  
-    refreshMe: () => Promise<void>;
-    login: (email: string, password: string) => Promise<void>;
-    register: (
-      email: string,
-      password: string,
-      displayName: string
-    ) => Promise<void>;
-    logout: () => Promise<void>;
-  };
-  
-  const AuthContext = createContext<AuthContextValue | null>(null);
-  
-  async function safeJson(res: Response) {
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { apiFetch, setAuthToken, getAuthToken } from "../lib/api";
+
+type AuthUser = {
+  id: string;
+  email: string;
+  displayName: string;
+  createdAt?: string;
+};
+
+type AuthContextValue = {
+  user: AuthUser | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+
+  refreshMe: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, displayName: string) => Promise<void>;
+  logout: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const authOpIdRef = useRef(0);
+
+  const isAuthenticated = !!user;
+
+  const refreshMe = async () => {
+    const opId = ++authOpIdRef.current;
+
     try {
-      return await res.json();
-    } catch {
-      return null;
-    }
-  }
-  
-  function getApiBase(): string {
-    // Production: same-origin via Vercel /api routes
-    if (import.meta.env.PROD) return "/api";
-    // Local dev
-    return "http://localhost:4000";
-  }
-  
-  export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-    children,
-  }) => {
-    const [user, setUser] = useState<AuthUser | null>(null);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-  
-    // Prevent stale responses overwriting newer auth state
-    const authOpIdRef = useRef(0);
-  
-    const isAuthenticated = !!user;
-  
-    const refreshMe = async () => {
-      const API = getApiBase();
-      const opId = ++authOpIdRef.current;
-  
-      const res = await fetch(`${API}/auth/me`, {
-        method: "GET",
-        credentials: "include",
-        cache: "no-store",
-      });
-  
-      const data = await safeJson(res);
-  
+      const data = await apiFetch("/auth/me", { method: "GET" });
+
       if (opId !== authOpIdRef.current) return;
-  
-      if (!res.ok) {
-        setUser(null);
-        return;
-      }
-  
+
       if (data?.user) setUser(data.user as AuthUser);
       else setUser(null);
-    };
-  
-    useEffect(() => {
-      let alive = true;
-  
-      const init = async () => {
-        try {
-          await refreshMe();
-        } finally {
-          if (alive) setIsLoading(false);
-        }
-      };
-  
-      init();
-      return () => {
-        alive = false;
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-  
-    const login = async (email: string, password: string) => {
-      const API = getApiBase();
-      const opId = ++authOpIdRef.current;
-  
-      const res = await fetch(`${API}/auth/login`, {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-  
-      const data = await safeJson(res);
-  
-      if (!res.ok) throw new Error(data?.error || "Login failed.");
-      if (!data?.user) throw new Error("Invalid login response.");
-  
+    } catch {
       if (opId !== authOpIdRef.current) return;
-  
-      setUser(data.user as AuthUser);
-    };
-  
-    const register = async (
-      email: string,
-      password: string,
-      displayName: string
-    ) => {
-      const API = getApiBase();
-      const opId = ++authOpIdRef.current;
-  
-      const res = await fetch(`${API}/auth/register`, {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, displayName }),
-      });
-  
-      const data = await safeJson(res);
-  
-      if (!res.ok) throw new Error(data?.error || "Registration failed.");
-      if (!data?.user) throw new Error("Invalid registration response.");
-  
-      if (opId !== authOpIdRef.current) return;
-  
-      setUser(data.user as AuthUser);
-    };
-  
-    const logout = async () => {
-      const API = getApiBase();
-      const opId = ++authOpIdRef.current;
-  
-      await fetch(`${API}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-      }).catch(() => {});
-  
-      if (opId !== authOpIdRef.current) return;
-  
       setUser(null);
+    }
+  };
+
+  useEffect(() => {
+    let alive = true;
+
+    const init = async () => {
+      try {
+        // If token exists, try to hydrate user
+        if (getAuthToken()) await refreshMe();
+      } finally {
+        if (alive) setIsLoading(false);
+      }
     };
-  
-    const value = useMemo<AuthContextValue>(
-      () => ({
-        user,
-        isLoading,
-        isAuthenticated,
-        refreshMe,
-        login,
-        register,
-        logout,
-      }),
-      [user, isLoading, isAuthenticated]
-    );
-  
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+
+    init();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    const opId = ++authOpIdRef.current;
+
+    const data = await apiFetch("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!data?.user || !data?.token) throw new Error("Invalid login response.");
+
+    if (opId !== authOpIdRef.current) return;
+
+    setAuthToken(data.token);
+    setUser(data.user as AuthUser);
   };
-  
-  export const useAuth = (): AuthContextValue => {
-    const ctx = useContext(AuthContext);
-    if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-    return ctx;
+
+  const register = async (email: string, password: string, displayName: string) => {
+    const opId = ++authOpIdRef.current;
+
+    const data = await apiFetch("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password, displayName }),
+    });
+
+    if (!data?.user || !data?.token) throw new Error("Invalid registration response.");
+
+    if (opId !== authOpIdRef.current) return;
+
+    setAuthToken(data.token);
+    setUser(data.user as AuthUser);
   };
-  
+
+  const logout = async () => {
+    const opId = ++authOpIdRef.current;
+
+    // Clear local token immediately
+    setAuthToken(null);
+    setUser(null);
+
+    // Best-effort: clear cookie on backend too
+    await apiFetch("/auth/logout", { method: "POST" }).catch(() => {});
+
+    if (opId !== authOpIdRef.current) return;
+  };
+
+  const value = useMemo<AuthContextValue>(
+    () => ({ user, isLoading, isAuthenticated, refreshMe, login, register, logout }),
+    [user, isLoading, isAuthenticated]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = (): AuthContextValue => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
+};

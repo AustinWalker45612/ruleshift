@@ -7,7 +7,7 @@ const router = express.Router();
 
 // -------------------- Auth middleware --------------------
 function requireAuth(req, res, next) {
-  const token = getTokenFromReq(req);
+  const token = getTokenFromReq(req); // supports Authorization: Bearer + cookie fallback
   if (!token) return res.status(401).json({ error: "Unauthorized" });
 
   try {

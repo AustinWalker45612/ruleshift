@@ -15,9 +15,6 @@ const {
 
 const router = express.Router();
 
-// 🔐 single source of truth for cookie name and you know
-const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "rs_token";
-
 function makeTokenPayload(user) {
   return {
     sub: user.id,
@@ -34,21 +31,14 @@ router.post("/register", async (req, res) => {
     const displayName = String(req.body?.displayName || "").trim();
 
     if (!email || !password || !displayName) {
-      return res
-        .status(400)
-        .json({ error: "email, password, and displayName are required" });
+      return res.status(400).json({ error: "email, password, and displayName are required" });
     }
-
     if (password.length < 8) {
-      return res
-        .status(400)
-        .json({ error: "Password must be at least 8 characters" });
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return res.status(409).json({ error: "Email already in use" });
-    }
+    if (existing) return res.status(409).json({ error: "Email already in use" });
 
     const passwordHash = await hashPassword(password);
 
@@ -57,11 +47,9 @@ router.post("/register", async (req, res) => {
     });
 
     const token = signToken(makeTokenPayload(user));
+    setAuthCookie(res, token); // optional
 
-    // ✅ FIX: pass cookie name explicitly
-    setAuthCookie(res, token, AUTH_COOKIE_NAME);
-
-    return res.status(201).json({ user: sanitizeUser(user) });
+    return res.status(201).json({ user: sanitizeUser(user), token });
   } catch (err) {
     console.error("register error:", err);
     return res.status(500).json({ error: "Server error" });
@@ -79,21 +67,15 @@ router.post("/login", async (req, res) => {
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+    if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
     const ok = await verifyPassword(password, user.passwordHash);
-    if (!ok) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+    if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
     const token = signToken(makeTokenPayload(user));
+    setAuthCookie(res, token); // optional
 
-    // ✅ FIX: pass cookie name explicitly
-    setAuthCookie(res, token, AUTH_COOKIE_NAME);
-
-    return res.status(200).json({ user: sanitizeUser(user) });
+    return res.status(200).json({ user: sanitizeUser(user), token });
   } catch (err) {
     console.error("login error:", err);
     return res.status(500).json({ error: "Server error" });
@@ -104,27 +86,25 @@ router.post("/login", async (req, res) => {
 router.get("/me", async (req, res) => {
   try {
     const token = getTokenFromReq(req);
-    if (!token) {
-      return res.status(401).json({ user: null });
-    }
+    if (!token) return res.status(401).json({ user: null });
 
     let decoded;
     try {
       decoded = verifyToken(token);
     } catch {
-      clearAuthCookie(res, AUTH_COOKIE_NAME);
+      clearAuthCookie(res);
       return res.status(401).json({ user: null });
     }
 
     const userId = decoded?.sub;
     if (!userId) {
-      clearAuthCookie(res, AUTH_COOKIE_NAME);
+      clearAuthCookie(res);
       return res.status(401).json({ user: null });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      clearAuthCookie(res, AUTH_COOKIE_NAME);
+      clearAuthCookie(res);
       return res.status(401).json({ user: null });
     }
 
@@ -137,7 +117,7 @@ router.get("/me", async (req, res) => {
 
 // ---------------- LOGOUT ----------------
 router.post("/logout", (_req, res) => {
-  clearAuthCookie(res, AUTH_COOKIE_NAME);
+  clearAuthCookie(res);
   return res.status(200).json({ ok: true });
 });
 
