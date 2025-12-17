@@ -2,20 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-
-// If you already have getApiBase somewhere else, import it.
-// Otherwise this local version will work.
-function getApiBase() {
-  // Prefer explicit env var if you set one
-  const env =
-    (import.meta as any)?.env?.VITE_API_BASE ||
-    (import.meta as any)?.env?.VITE_SERVER_URL;
-
-  if (env) return String(env).replace(/\/$/, "");
-
-  // Fallback: your Render backend
-  return "https://ruleshift-backend.onrender.com";
-}
+import { apiFetch } from "../lib/api";
 
 type DuelOutcome = "WIN" | "LOSS";
 
@@ -23,17 +10,11 @@ type RecentDuel = {
   duelKey: string;
   outcome: DuelOutcome;
   scoreEarned: number;
-  createdAt: string; // ISO
+  createdAt: string;
 };
 
 type StatsMeResponse = {
   ok: boolean;
-  user?: {
-    id: string;
-    email: string;
-    displayName: string;
-    createdAt?: string;
-  };
   totals?: {
     totalDuels: number;
     wins: number;
@@ -45,70 +26,47 @@ type StatsMeResponse = {
   error?: string;
 };
 
-async function safeJson(res: Response) {
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
 
-  const API = useMemo(() => getApiBase(), []);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<StatsMeResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // If not logged in, redirect to login
+  // If not logged in, go to login
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (!isLoading && !isAuthenticated) {
       navigate("/login", { replace: true });
     }
-  }, [isLoading, user, navigate]);
+  }, [isLoading, isAuthenticated, navigate]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function run() {
-      if (isLoading) return;
-      if (!user) return;
-
+  const load = useMemo(() => {
+    return async () => {
       setLoading(true);
       setErr(null);
 
       try {
-        const res = await fetch(`${API}/stats/me`, {
+        const json = (await apiFetch("/stats/me?recent=10", {
           method: "GET",
-          credentials: "include",
           cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-        });
+        })) as StatsMeResponse;
 
-        const json = (await safeJson(res)) as StatsMeResponse | null;
-
-        if (!res.ok) {
-          const msg =
-            json?.error ||
-            `Failed to load stats (HTTP ${res.status})`;
-          throw new Error(msg);
-        }
-
-        if (!cancelled) setData(json);
+        setData(json);
       } catch (e: any) {
-        if (!cancelled) setErr(e?.message || "Failed to load profile.");
+        setData(null);
+        setErr(e?.message || "Failed to load profile.");
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
-    }
-
-    run();
-    return () => {
-      cancelled = true;
     };
-  }, [API, isLoading, user]);
+  }, []);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated) return;
+    load();
+  }, [isLoading, isAuthenticated, load]);
 
   const cardStyle: React.CSSProperties = {
     width: "100%",
@@ -153,7 +111,7 @@ export default function Profile() {
 
   const totals = data?.totals;
   const recent = data?.recent || [];
-  const displayName = user?.displayName || data?.user?.displayName || "Player";
+  const displayName = user?.displayName || "Player";
 
   return (
     <div
@@ -204,12 +162,14 @@ export default function Profile() {
               color: "#fecaca",
             }}
           >
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>Couldn’t load profile</div>
+            <div style={{ fontWeight: 800, marginBottom: 6 }}>
+              Couldn’t load profile
+            </div>
             <div style={{ fontSize: 13, opacity: 0.95 }}>{err}</div>
 
             <button
               style={{ ...smallButtonStyle, marginTop: 10 }}
-              onClick={() => window.location.reload()}
+              onClick={load}
             >
               Retry
             </button>
@@ -281,9 +241,7 @@ export default function Profile() {
 
             <div style={{ height: 1, background: "#1f2937", margin: "16px 0" }} />
 
-            <h2 style={{ margin: "0 0 10px 0", fontSize: 16 }}>
-              Recent Duels
-            </h2>
+            <h2 style={{ margin: "0 0 10px 0", fontSize: 16 }}>Recent Duels</h2>
 
             {recent.length === 0 ? (
               <div style={{ opacity: 0.8, fontSize: 13 }}>
@@ -319,9 +277,7 @@ export default function Profile() {
                         </div>
                       </div>
 
-                      <div style={{ fontWeight: 900 }}>
-                        +{d.scoreEarned}
-                      </div>
+                      <div style={{ fontWeight: 900 }}>+{d.scoreEarned}</div>
                     </div>
                   );
                 })}
