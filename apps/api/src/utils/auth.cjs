@@ -60,16 +60,20 @@ function clearAuthCookie(res) {
 }
 
 function getTokenFromReq(req) {
-  // 1) Prefer Authorization: Bearer <token>  (works on iPhone Chrome)
+  // 1) cookie
+  const cookieToken = req?.cookies?.[COOKIE_NAME];
+  if (cookieToken) return cookieToken;
+
+  // 2) Authorization: Bearer <token>
   const auth = req?.headers?.authorization || req?.headers?.Authorization;
   if (typeof auth === "string") {
     const m = auth.match(/^Bearer\s+(.+)$/i);
-    if (m?.[1]) return m[1].trim();
+    if (m) return m[1];
   }
 
-  // 2) Fallback to cookie (works on same-site / many desktop setups)
-  return req?.cookies?.[COOKIE_NAME] || null;
+  return null;
 }
+
 
 // -------------------- Password helpers --------------------
 async function hashPassword(plain) {

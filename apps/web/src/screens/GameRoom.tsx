@@ -23,6 +23,8 @@ import { TabletLayout } from "../layouts/TabletLayout";
 import { MobileLayout } from "../layouts/MobileLayout";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 
+import { apiFetch } from "../lib/api";
+
 const LS_GUEST_NAME_KEY = "ruleshiftGuestName_v1";
 
 // ---------- Types shared with server state ----------
@@ -1263,15 +1265,8 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
 
     (async () => {
       try {
-        // ✅ Use your API base if you have one; otherwise this hits same-origin.
-        const API =
-          (import.meta as any)?.env?.VITE_API_URL?.replace(/\/+$/, "") ||
-          "http://localhost:4000";
-
-        await fetch(`${API}/stats/duel/complete`, {
+        await apiFetch("/stats/duel/complete", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify({ scoreEarned, outcome, duelKey }),
         });
       } catch (e) {
