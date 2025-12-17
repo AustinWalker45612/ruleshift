@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { LeaderboardCard } from "../components/LeaderBoardCard";
 
-
 const generateRoomId = (): string => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I/O/1/0
   let id = "";
@@ -66,6 +65,17 @@ export const HomePage: React.FC = () => {
     whiteSpace: "nowrap",
   };
 
+  const mainCardStyle: React.CSSProperties = {
+    width: "100%",
+    maxWidth: 560,
+    background: "#111827",
+    borderRadius: 16,
+    border: "1px solid #1f2937",
+    padding: 20,
+    boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
+    color: "#e5e7eb",
+  };
+
   return (
     <div
       style={{
@@ -74,7 +84,7 @@ export const HomePage: React.FC = () => {
         position: "relative",
       }}
     >
-      {/* Top bar (uses the “empty space” up top) */}
+      {/* Top bar (uses the empty space up top) */}
       <div
         style={{
           position: "fixed",
@@ -85,7 +95,7 @@ export const HomePage: React.FC = () => {
           padding: 12,
           display: "flex",
           justifyContent: "flex-end",
-          pointerEvents: "none", // allows background clicks except inside the bar
+          pointerEvents: "none",
         }}
       >
         <div
@@ -137,76 +147,69 @@ export const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Page content (padding top so it doesn’t sit under the fixed top bar) */}
+      {/* Page content */}
       <div
         style={{
           minHeight: "100vh",
           display: "flex",
-          alignItems: "center",
           justifyContent: "center",
           padding: 16,
-          paddingTop: "clamp(24px, 7vh, 110px)", // 👈 this lifts the card up on all screens
+          paddingTop: "clamp(24px, 7vh, 110px)", // lifts everything up under the fixed top bar
         }}
       >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 560,
-            background: "#111827",
-            borderRadius: 16,
-            border: "1px solid #1f2937",
-            padding: 20,
-            boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
-            color: "#e5e7eb",
-          }}
-        >
-          <h1 style={{ margin: 0, fontSize: 28 }}>RuleShift</h1>
-          <p style={{ marginTop: 8, opacity: 0.9, fontSize: 14 }}>
-            A two-player duel: one patches the rules, the other breaks the code.
-          </p>
-
-          <div style={{ marginTop: 16 }}>
-            <button style={buttonStyle} onClick={onCreateRoom}>
-              Create New Room
-            </button>
-
-            <p
-              style={{
-                margin: "10px 0",
-                opacity: 0.7,
-                fontSize: 12,
-                textAlign: "center",
-              }}
-            >
-              or
+        {/* Stack: Main card + Leaderboard card */}
+        <div style={{ width: "100%", maxWidth: 560 }}>
+          {/* Main card */}
+          <div style={mainCardStyle}>
+            <h1 style={{ margin: 0, fontSize: 28 }}>RuleShift</h1>
+            <p style={{ marginTop: 8, opacity: 0.9, fontSize: 14 }}>
+              A two-player duel: one patches the rules, the other breaks the code.
             </p>
 
-            <label style={{ display: "block", fontSize: 13 }}>
-              Join existing room:
-              <input
-                style={inputStyle}
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="ENTER CODE (e.g. K7P2Q)"
-                maxLength={10}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onJoinRoom();
-                }}
-              />
-            </label>
+            <div style={{ marginTop: 16 }}>
+              <button style={buttonStyle} onClick={onCreateRoom}>
+                Create New Room
+              </button>
 
-            <button
-              style={{ ...buttonStyle, marginTop: 12, opacity: canJoin ? 1 : 0.5 }}
-              onClick={onJoinRoom}
-              disabled={!canJoin}
-            >
-              Join Room
-            </button>
+              <p
+                style={{
+                  margin: "10px 0",
+                  opacity: 0.7,
+                  fontSize: 12,
+                  textAlign: "center",
+                }}
+              >
+                or
+              </p>
+
+              <label style={{ display: "block", fontSize: 13 }}>
+                Join existing room:
+                <input
+                  style={inputStyle}
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="ENTER CODE (e.g. K7P2Q)"
+                  maxLength={10}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onJoinRoom();
+                  }}
+                />
+              </label>
+
+              <button
+                style={{ ...buttonStyle, marginTop: 12, opacity: canJoin ? 1 : 0.5 }}
+                onClick={onJoinRoom}
+                disabled={!canJoin}
+              >
+                Join Room
+              </button>
+            </div>
           </div>
+
+          {/* Leaderboard card */}
+          <LeaderboardCard />
         </div>
       </div>
-      {/* new leaderboard card */}
-      <LeaderboardCard />
     </div>
   );
 };
