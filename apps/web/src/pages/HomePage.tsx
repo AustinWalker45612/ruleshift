@@ -65,15 +65,14 @@ export const HomePage: React.FC = () => {
     whiteSpace: "nowrap",
   };
 
-  const mainCardStyle: React.CSSProperties = {
+  const cardStyle: React.CSSProperties = {
     width: "100%",
-    maxWidth: "min(560px, 100%)",
-    paddingInline: 12, // 👈 KEY FIX (iOS safe)
+    boxSizing: "border-box",
     background: "#111827",
     borderRadius: 16,
     border: "1px solid #1f2937",
     padding: 20,
-    boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
+    boxShadow: "0 16px 40px rgba(0,0,0,0.55)",
     color: "#e5e7eb",
   };
 
@@ -83,9 +82,10 @@ export const HomePage: React.FC = () => {
         minHeight: "100vh",
         background: "#0f172a",
         position: "relative",
+        overflowX: "hidden", // 👈 stops any stray horizontal overflow on iOS
       }}
     >
-      {/* Top bar (uses the empty space up top) */}
+      {/* Top bar */}
       <div
         style={{
           position: "fixed",
@@ -148,20 +148,30 @@ export const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Page content */}
+      {/* Content */}
       <div
         style={{
           minHeight: "100vh",
           display: "flex",
           justifyContent: "center",
-          padding: 16,
-          paddingTop: "clamp(24px, 7vh, 110px)", // lifts everything up under the fixed top bar
+          paddingTop: 76, // room for fixed top bar
+          paddingBottom: 28,
         }}
       >
-        {/* Stack: Main card + Leaderboard card */}
-        <div style={{ width: "100%", maxWidth: 560 }}>
+        {/* This wrapper is the KEY for iPhone: safe side padding + max width */}
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 560,
+            paddingInline: 16, // 👈 iPhone-safe gutter
+            boxSizing: "border-box",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
           {/* Main card */}
-          <div style={mainCardStyle}>
+          <div style={cardStyle}>
             <h1 style={{ margin: 0, fontSize: 28 }}>RuleShift</h1>
             <p style={{ marginTop: 8, opacity: 0.9, fontSize: 14 }}>
               A two-player duel: one patches the rules, the other breaks the code.
@@ -207,8 +217,10 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Leaderboard card */}
-          <LeaderboardCard />
+          {/* Leaderboard card (kept INSIDE the same wrapper so it can’t overflow on iPhone) */}
+          <div style={cardStyle}>
+            <LeaderboardCard />
+          </div>
         </div>
       </div>
     </div>
