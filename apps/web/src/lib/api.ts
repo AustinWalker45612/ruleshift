@@ -1,6 +1,6 @@
 // src/libs/api.ts
 export function getApiBase() {
-    return import.meta.env.VITE_API_BASE || "http://localhost:10000";
+    return import.meta.env.VITE_API_BASE;
   }
   
   export function getAuthToken(): string | null {
