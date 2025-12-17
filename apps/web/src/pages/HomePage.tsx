@@ -15,7 +15,6 @@ export const HomePage: React.FC = () => {
   const { user, logout, isLoading } = useAuth();
 
   const [joinCode, setJoinCode] = useState("");
-
   const canJoin = useMemo(() => joinCode.trim().length >= 4, [joinCode]);
 
   const onCreateRoom = () => {
@@ -70,125 +69,138 @@ export const HomePage: React.FC = () => {
       style={{
         minHeight: "100vh",
         background: "#0f172a",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
+        position: "relative",
       }}
     >
+      {/* Top bar (uses the “empty space” up top) */}
       <div
         style={{
-          width: "100%",
-          maxWidth: 560,
-          background: "#111827",
-          borderRadius: 16,
-          border: "1px solid #1f2937",
-          padding: 20,
-          boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
-          color: "#e5e7eb",
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 50,
+          padding: 12,
+          display: "flex",
+          justifyContent: "flex-end",
+          pointerEvents: "none", // allows background clicks except inside the bar
         }}
       >
-        {/* Header row (wraps on iPhone instead of overlapping) */}
         <div
           style={{
+            pointerEvents: "auto",
             display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 12,
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: 10,
             flexWrap: "wrap",
+            maxWidth: 980,
+            width: "100%",
           }}
         >
-          <div style={{ minWidth: 200, flex: "1 1 240px" }}>
-            <h1 style={{ margin: 0, fontSize: 28 }}>RuleShift</h1>
-            <p style={{ marginTop: 8, opacity: 0.9, fontSize: 14 }}>
-              A two-player duel: one patches the rules, the other breaks the code.
-            </p>
-          </div>
+          {isLoading ? (
+            <div style={{ fontSize: 12, opacity: 0.7, color: "#e5e7eb" }}>
+              Loading…
+            </div>
+          ) : user ? (
+            <>
+              <div style={{ fontSize: 12, opacity: 0.85, color: "#e5e7eb" }}>
+                Logged in as <strong>{user.displayName}</strong>
+              </div>
 
-          {/* Auth area */}
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              justifyContent: "flex-end",
-              flex: "0 1 auto",
-              flexWrap: "wrap",
-            }}
-          >
-            {isLoading ? (
-              <div style={{ fontSize: 12, opacity: 0.65 }}>Loading…</div>
-            ) : user ? (
-              <>
-                <div style={{ fontSize: 12, opacity: 0.85 }}>
-                  Logged in as <strong>{user.displayName}</strong>
-                </div>
+              <button style={smallButtonStyle} onClick={() => navigate("/profile")}>
+                Profile
+              </button>
 
-                <button
-                  style={smallButtonStyle}
-                  onClick={() => navigate("/profile")}
-                >
-                  Profile
-                </button>
-
-                <button
-                  style={smallButtonStyle}
-                  onClick={async () => {
-                    await logout();
-                    navigate("/");
-                  }}
-                >
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: 12, opacity: 0.65 }}>Not logged in</div>
-                <button style={smallButtonStyle} onClick={() => navigate("/login")}>
-                  Login
-                </button>
-              </>
-            )}
-          </div>
+              <button
+                style={smallButtonStyle}
+                onClick={async () => {
+                  await logout();
+                  navigate("/");
+                }}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 12, opacity: 0.7, color: "#e5e7eb" }}>
+                Not logged in
+              </div>
+              <button style={smallButtonStyle} onClick={() => navigate("/login")}>
+                Login
+              </button>
+            </>
+          )}
         </div>
+      </div>
 
-        <div style={{ marginTop: 16 }}>
-          <button style={buttonStyle} onClick={onCreateRoom}>
-            Create New Room
-          </button>
-
-          <p
-            style={{
-              margin: "10px 0",
-              opacity: 0.7,
-              fontSize: 12,
-              textAlign: "center",
-            }}
-          >
-            or
+      {/* Page content (padding top so it doesn’t sit under the fixed top bar) */}
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 16,
+          paddingTop: 72,
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 560,
+            background: "#111827",
+            borderRadius: 16,
+            border: "1px solid #1f2937",
+            padding: 20,
+            boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
+            color: "#e5e7eb",
+          }}
+        >
+          <h1 style={{ margin: 0, fontSize: 28 }}>RuleShift</h1>
+          <p style={{ marginTop: 8, opacity: 0.9, fontSize: 14 }}>
+            A two-player duel: one patches the rules, the other breaks the code.
           </p>
 
-          <label style={{ display: "block", fontSize: 13 }}>
-            Join existing room:
-            <input
-              style={inputStyle}
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="ENTER CODE (e.g. K7P2Q)"
-              maxLength={10}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onJoinRoom();
-              }}
-            />
-          </label>
+          <div style={{ marginTop: 16 }}>
+            <button style={buttonStyle} onClick={onCreateRoom}>
+              Create New Room
+            </button>
 
-          <button
-            style={{ ...buttonStyle, marginTop: 12, opacity: canJoin ? 1 : 0.5 }}
-            onClick={onJoinRoom}
-            disabled={!canJoin}
-          >
-            Join Room
-          </button>
+            <p
+              style={{
+                margin: "10px 0",
+                opacity: 0.7,
+                fontSize: 12,
+                textAlign: "center",
+              }}
+            >
+              or
+            </p>
+
+            <label style={{ display: "block", fontSize: 13 }}>
+              Join existing room:
+              <input
+                style={inputStyle}
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                placeholder="ENTER CODE (e.g. K7P2Q)"
+                maxLength={10}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onJoinRoom();
+                }}
+              />
+            </label>
+
+            <button
+              style={{ ...buttonStyle, marginTop: 12, opacity: canJoin ? 1 : 0.5 }}
+              onClick={onJoinRoom}
+              disabled={!canJoin}
+            >
+              Join Room
+            </button>
+          </div>
         </div>
       </div>
     </div>
