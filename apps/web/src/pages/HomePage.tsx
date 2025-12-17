@@ -2,6 +2,8 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { LeaderboardCard } from "../components/LeaderBoardCard";
+
 
 const generateRoomId = (): string => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I/O/1/0
@@ -143,7 +145,7 @@ export const HomePage: React.FC = () => {
           alignItems: "center",
           justifyContent: "center",
           padding: 16,
-          paddingTop: 72,
+          paddingTop: "clamp(24px, 7vh, 110px)", // 👈 this lifts the card up on all screens
         }}
       >
         <div
@@ -203,6 +205,8 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* new leaderboard card */}
+      <LeaderboardCard />
     </div>
   );
 };
