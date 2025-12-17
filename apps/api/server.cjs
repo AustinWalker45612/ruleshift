@@ -41,6 +41,15 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+// 🔍 TEMP DEBUG ROUTE (remove after testing)
+app.get("/debug/cookies", (req, res) => {
+  res.json({
+    cookies: req.cookies || null,
+    rawHeader: req.headers.cookie || null,
+  });
+});
+
+
 // Routes
 app.use("/auth", authRouter);
 app.use("/stats", statsRouter);
