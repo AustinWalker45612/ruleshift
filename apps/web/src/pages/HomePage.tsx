@@ -67,7 +67,8 @@ export const HomePage: React.FC = () => {
 
   const mainCardStyle: React.CSSProperties = {
     width: "100%",
-    maxWidth: 560,
+    maxWidth: "min(560px, 100%)",
+    paddingInline: 12, // 👈 KEY FIX (iOS safe)
     background: "#111827",
     borderRadius: 16,
     border: "1px solid #1f2937",
