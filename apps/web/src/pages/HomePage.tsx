@@ -38,7 +38,7 @@ export const HomePage: React.FC = () => {
     border: "1px solid #374151",
     background: "#020617",
     color: "#e5e7eb",
-    fontSize: 16,
+    fontSize: 16, // prevents iOS zoom
     letterSpacing: 2,
   };
 
@@ -62,6 +62,7 @@ export const HomePage: React.FC = () => {
     cursor: "pointer",
     fontWeight: 700,
     fontSize: 12,
+    whiteSpace: "nowrap",
   };
 
   return (
@@ -85,62 +86,71 @@ export const HomePage: React.FC = () => {
           padding: 20,
           boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
           color: "#e5e7eb",
-          position: "relative",
         }}
       >
-        {/* Top right auth */}
+        {/* Header row (wraps on iPhone instead of overlapping) */}
         <div
           style={{
-            position: "absolute",
-            top: 14,
-            right: 14,
             display: "flex",
-            gap: 10,
-            alignItems: "center",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
           }}
         >
-          {isLoading ? (
-            <div style={{ fontSize: 12, opacity: 0.65 }}>Loading…</div>
-          ) : user ? (
-            <>
-              <div style={{ fontSize: 12, opacity: 0.85 }}>
-                Logged in as <strong>{user.displayName}</strong>
-              </div>
+          <div style={{ minWidth: 200, flex: "1 1 240px" }}>
+            <h1 style={{ margin: 0, fontSize: 28 }}>RuleShift</h1>
+            <p style={{ marginTop: 8, opacity: 0.9, fontSize: 14 }}>
+              A two-player duel: one patches the rules, the other breaks the code.
+            </p>
+          </div>
 
-              {/* Profile button */}
-              <button
-                style={smallButtonStyle}
-                onClick={() => navigate("/profile")}
-              >
-                Profile
-              </button>
+          {/* Auth area */}
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              justifyContent: "flex-end",
+              flex: "0 1 auto",
+              flexWrap: "wrap",
+            }}
+          >
+            {isLoading ? (
+              <div style={{ fontSize: 12, opacity: 0.65 }}>Loading…</div>
+            ) : user ? (
+              <>
+                <div style={{ fontSize: 12, opacity: 0.85 }}>
+                  Logged in as <strong>{user.displayName}</strong>
+                </div>
 
-              <button
-                style={smallButtonStyle}
-                onClick={async () => {
-                  await logout();
-                  navigate("/");
-                }}
-              >
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <div style={{ fontSize: 12, opacity: 0.65 }}>Not logged in</div>
-              <button style={smallButtonStyle} onClick={() => navigate("/login")}>
-                Login
-              </button>
-            </>
-          )}
+                <button
+                  style={smallButtonStyle}
+                  onClick={() => navigate("/profile")}
+                >
+                  Profile
+                </button>
+
+                <button
+                  style={smallButtonStyle}
+                  onClick={async () => {
+                    await logout();
+                    navigate("/");
+                  }}
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 12, opacity: 0.65 }}>Not logged in</div>
+                <button style={smallButtonStyle} onClick={() => navigate("/login")}>
+                  Login
+                </button>
+              </>
+            )}
+          </div>
         </div>
-
-        <h1 style={{ margin: 0, fontSize: 28, paddingRight: 160 }}>
-          RuleShift
-        </h1>
-        <p style={{ marginTop: 8, opacity: 0.9, fontSize: 14 }}>
-          A two-player duel: one patches the rules, the other breaks the code.
-        </p>
 
         <div style={{ marginTop: 16 }}>
           <button style={buttonStyle} onClick={onCreateRoom}>
