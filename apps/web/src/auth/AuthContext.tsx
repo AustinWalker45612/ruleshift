@@ -1,5 +1,12 @@
 // src/auth/AuthContext.tsx
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { apiFetch, setAuthToken, getAuthToken } from "../lib/api";
 
 type AuthUser = {
@@ -22,11 +29,14 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const authOpIdRef = useRef(0);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // prevents stale async responses overwriting newer auth state
+  const authOpIdRef = useRef(0);
   const isAuthenticated = !!user;
 
   const refreshMe = async () => {
@@ -48,16 +58,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let alive = true;
 
-    const init = async () => {
+    (async () => {
       try {
-        // If token exists, try to hydrate user
-        if (getAuthToken()) await refreshMe();
+        // Try to hydrate if either:
+        // - we have a local token (iPhone / no-cookie path)
+        // - or we might have a cookie session (desktop path)
+        const hasLocalToken = !!getAuthToken();
+
+        if (hasLocalToken) {
+          await refreshMe();
+        } else {
+          // still attempt cookie-based session once
+          await refreshMe();
+        }
       } finally {
         if (alive) setIsLoading(false);
       }
-    };
+    })();
 
-    init();
     return () => {
       alive = false;
     };
@@ -72,6 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       body: JSON.stringify({ email, password }),
     });
 
+    // IMPORTANT: this assumes your backend returns { user, token } for the iPhone path.
     if (!data?.user || !data?.token) throw new Error("Invalid login response.");
 
     if (opId !== authOpIdRef.current) return;
@@ -99,18 +118,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     const opId = ++authOpIdRef.current;
 
-    // Clear local token immediately
+    // clear local state immediately
     setAuthToken(null);
     setUser(null);
 
-    // Best-effort: clear cookie on backend too
+    // best-effort: clear cookie on backend too
     await apiFetch("/auth/logout", { method: "POST" }).catch(() => {});
 
     if (opId !== authOpIdRef.current) return;
   };
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isLoading, isAuthenticated, refreshMe, login, register, logout }),
+    () => ({
+      user,
+      isLoading,
+      isAuthenticated,
+      refreshMe,
+      login,
+      register,
+      logout,
+    }),
     [user, isLoading, isAuthenticated]
   );
 

@@ -1,6 +1,19 @@
 // src/libs/api.ts
-export function getApiBase() {
-    return import.meta.env.VITE_API_BASE;
+export function getApiBase(): string {
+    // Prefer explicit env var
+    const raw = (import.meta as any).env?.VITE_API_BASE as string | undefined;
+  
+    // Guard against missing env or the literal strings "undefined"/"null"
+    if (!raw || raw === "undefined" || raw === "null") {
+      // Dev fallback
+      if (!(import.meta as any).env?.PROD) return "http://localhost:10000";
+  
+      // Prod fallback: if you use Vercel rewrites, this is the safest default
+      return "/api";
+    }
+  
+    // Normalize: no trailing slash
+    return raw.endsWith("/") ? raw.slice(0, -1) : raw;
   }
   
   export function getAuthToken(): string | null {
@@ -16,6 +29,9 @@ export function getApiBase() {
     const API = getApiBase();
     const token = getAuthToken();
   
+    // Normalize path
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  
     const headers: Record<string, string> = {
       ...(init.headers as any),
     };
@@ -29,7 +45,7 @@ export function getApiBase() {
       headers["Authorization"] = `Bearer ${token}`;
     }
   
-    const res = await fetch(`${API}${path}`, {
+    const res = await fetch(`${API}${cleanPath}`, {
       ...init,
       // keep include for desktop cookie fallback; Bearer will be primary on iPhone
       credentials: "include",
@@ -37,7 +53,13 @@ export function getApiBase() {
     });
   
     const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    let data: any = null;
+  
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = text || null;
+    }
   
     if (!res.ok) throw new Error(data?.error || "Request failed");
     return data;
