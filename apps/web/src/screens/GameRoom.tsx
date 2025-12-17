@@ -1248,7 +1248,8 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     if (!userId) return;
 
     // players only (not spectators)
-    if (playerSeat === null) return;
+    if (thisPlayerIndex === null || thisPlayerIndex === undefined || thisPlayerIndex < 0) return;
+
 
     const winnerIndex =
       phase === "breakerWin" ? currentBreakerIndex : currentPatcherIndex;
