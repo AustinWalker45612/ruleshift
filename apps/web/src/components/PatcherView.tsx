@@ -113,6 +113,30 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
     ...inputStyle,
   };
 
+  const quickTemplates: Array<{ value: RuleTemplate; label: string }> = [
+    { value: "positionEquals", label: "Pos = _" },
+    { value: "positionKind", label: "Pos is Letter/Digit" },
+    { value: "mustContainChar", label: "Must contain _" },
+    { value: "forbiddenChar", label: "Forbid _" },
+    { value: "exactLettersDigits", label: "Letters/Digits = 4" },
+    { value: "allUnique", label: "All unique" },
+    { value: "endsMirror", label: "Ends match" },
+    { value: "noAdjacentDuplicates", label: "No adj duplicates" },
+  ];
+
+  const chipBase: React.CSSProperties = {
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: "1px solid #374151",
+    background: "#0b1220",
+    color: "#e5e7eb",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    userSelect: "none",
+  };
+
   return (
     <div
       style={{
@@ -143,6 +167,40 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
 
         {/* NEW RULE SECTION FIRST */}
         <div style={{ marginTop: 16, marginBottom: 16 }}>
+          {/* Quick templates */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>
+              Quick templates:
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              {quickTemplates.map((t) => {
+                const active = selectedTemplate === t.value;
+                return (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => setSelectedTemplate(t.value)}
+                    style={{
+                      ...chipBase,
+                      borderColor: active ? "#60a5fa" : "#374151",
+                      background: active ? "#0b2a4a" : "#0b1220",
+                    }}
+                    aria-pressed={active}
+                    title={`Use template: ${t.label}`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <label style={{ display: "block", marginBottom: 8 }}>
             New Rule Template:
             <select
