@@ -56,3 +56,23 @@ model DuelResult {
   @@index([userId])
   @@index([createdAt])
 }
+
+enum MatchmakingStatus {
+  WAITING
+  MATCHED
+  ABANDONED
+}
+
+model MatchmakingRoom {
+  id          String            @id @default(cuid())
+  roomId      String            @unique
+  status      MatchmakingStatus @default(WAITING)
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  matchedAt   DateTime?
+  abandonedAt DateTime?
+
+  @@index([status, createdAt])
+}
+

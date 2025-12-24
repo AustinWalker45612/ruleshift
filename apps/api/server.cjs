@@ -6,6 +6,8 @@ const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { Server } = require("socket.io");
+const { matchmakeRouter } = require("./src/routes/matchmake.routes.cjs");
+
 
 // -------------------- Database --------------------
 // ✅ Adapter setup should export { prisma, pool }
@@ -53,6 +55,7 @@ app.get("/debug/cookies", (req, res) => {
 // Routes
 app.use("/auth", authRouter);
 app.use("/stats", statsRouter);
+app.use("/matchmake", matchmakeRouter);
 
 // -------------------- HTTP + Socket.IO --------------------
 const server = http.createServer(app);

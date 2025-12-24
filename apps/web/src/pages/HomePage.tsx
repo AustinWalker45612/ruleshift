@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { LeaderboardCard } from "../components/LeaderBoardCard";
+import { apiFetch } from "../lib/api";
 
 const generateRoomId = (): string => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I/O/1/0
@@ -18,6 +19,8 @@ export const HomePage: React.FC = () => {
   const [joinCode, setJoinCode] = useState("");
   const canJoin = useMemo(() => joinCode.trim().length >= 4, [joinCode]);
 
+  const [mmStatus, setMmStatus] = useState<"idle" | "loading" | "error">("idle");
+
   const onCreateRoom = () => {
     const id = generateRoomId();
     navigate(`/room/${id}`);
@@ -27,6 +30,21 @@ export const HomePage: React.FC = () => {
     const id = joinCode.trim().toUpperCase();
     if (!id) return;
     navigate(`/room/${id}`);
+  };
+
+  const onFindGame = async () => {
+    if (mmStatus === "loading") return;
+    setMmStatus("loading");
+    try {
+      const data = await apiFetch("/matchmake", { method: "POST" });
+      const id = (data?.roomId || "").toString().trim().toUpperCase();
+      if (!id) throw new Error("No roomId returned");
+      navigate(`/room/${id}`);
+    } catch (e) {
+      console.error("Matchmaking failed:", e);
+      setMmStatus("error");
+      setTimeout(() => setMmStatus("idle"), 2000);
+    }
   };
 
   const inputStyle: React.CSSProperties = {
@@ -51,6 +69,11 @@ export const HomePage: React.FC = () => {
     cursor: "pointer",
     background: "#16a34a",
     color: "#e5e7eb",
+  };
+
+  const secondaryButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    background: "#2563eb",
   };
 
   const smallButtonStyle: React.CSSProperties = {
@@ -178,6 +201,33 @@ export const HomePage: React.FC = () => {
             </p>
 
             <div style={{ marginTop: 16 }}>
+              <button
+                style={{
+                  ...secondaryButtonStyle,
+                  opacity: mmStatus === "loading" ? 0.7 : 1,
+                  cursor: mmStatus === "loading" ? "not-allowed" : "pointer",
+                }}
+                onClick={onFindGame}
+                disabled={mmStatus === "loading"}
+              >
+                {mmStatus === "loading"
+                  ? "Finding match…"
+                  : mmStatus === "error"
+                  ? "Matchmaking failed — try again"
+                  : "Find Game (Matchmaking)"}
+              </button>
+
+              <p
+                style={{
+                  margin: "12px 0 10px",
+                  opacity: 0.55,
+                  fontSize: 12,
+                  textAlign: "center",
+                }}
+              >
+                or use Room Codes
+              </p>
+
               <button style={buttonStyle} onClick={onCreateRoom}>
                 Create New Room
               </button>

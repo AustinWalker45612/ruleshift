@@ -1,5 +1,6 @@
 // src/screens/GameRoom.tsx
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { socket } from "../socket";
 import { useAuth } from "../auth/AuthContext";
 
@@ -114,6 +115,7 @@ type GameRoomProps = {
 };
 
 const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
+  const navigate = useNavigate();
   const breakpoint = useBreakpoint();
   const { user } = useAuth();
 
@@ -154,6 +156,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">(
     "idle"
   );
+  const [leaving, setLeaving] = useState(false);
 
   const handleCopyRoomLink = async () => {
     if (typeof window === "undefined" || !roomId) return;
@@ -167,6 +170,29 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
       setCopyStatus("error");
       setTimeout(() => setCopyStatus("idle"), 2000);
     }
+  };
+
+  const leaveRoom = async () => {
+    if (leaving) return;
+    setLeaving(true);
+
+    // Best-effort: remove from matchmaking pool if backend supports it.
+    try {
+      await apiFetch("/matchmake/leave", {
+        method: "POST",
+        body: JSON.stringify({ roomId }),
+      });
+    } catch (e) {
+      console.warn("matchmake/leave failed (ignored):", e);
+    }
+
+    try {
+      socket.emit("room:leave", { roomId, clientId });
+    } catch {
+      // ignore
+    }
+
+    navigate("/");
   };
 
   const [players, setPlayers] = useState<Player[]>([
@@ -375,6 +401,14 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
       socket.off("room:presence", handlePresence);
     };
   }, [roomId]);
+
+  const occupiedSeatsCount = useMemo(() => {
+    if (!roomPresence?.seats) return 0;
+    return roomPresence.seats.filter((s) => s.occupied).length;
+  }, [roomPresence]);
+
+  // Waiting UI: only when room has <2 players and we haven't started the duel yet
+  const waitingForOpponent = occupiedSeatsCount < 2 && phase === "enterNames";
 
   const broadcastState = (overrides: Partial<SyncedState> = {}) => {
     if (!roomId) return;
@@ -1250,8 +1284,12 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     if (!userId) return;
 
     // players only (not spectators)
-    if (thisPlayerIndex === null || thisPlayerIndex === undefined || thisPlayerIndex < 0) return;
-
+    if (
+      thisPlayerIndex === null ||
+      thisPlayerIndex === undefined ||
+      thisPlayerIndex < 0
+    )
+      return;
 
     const winnerIndex =
       phase === "breakerWin" ? currentBreakerIndex : currentPatcherIndex;
@@ -1381,6 +1419,105 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     tutorialMode,
     setTutorialMode,
   };
+
+  // ✅ Waiting screen (matchmaking-friendly)
+  if (waitingForOpponent) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#0f172a",
+          position: "relative",
+          overflowX: "hidden",
+        }}
+      >
+        <div
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            justifyContent: "center",
+            paddingTop: 76,
+            paddingBottom: 28,
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 560,
+              paddingInline: 16,
+              boxSizing: "border-box",
+            }}
+          >
+            <div
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                background: "#111827",
+                borderRadius: 16,
+                border: "1px solid #1f2937",
+                padding: 20,
+                boxShadow: "0 16px 40px rgba(0,0,0,0.55)",
+                color: "#e5e7eb",
+              }}
+            >
+              <h2 style={{ margin: 0, marginBottom: 8 }}>
+                Waiting for opponent…
+              </h2>
+
+              <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 12 }}>
+                Room code:{" "}
+                <strong style={{ letterSpacing: 2 }}>{roomId}</strong>
+              </div>
+
+              <button
+                onClick={handleCopyRoomLink}
+                style={{
+                  width: "100%",
+                  padding: "10px 0",
+                  borderRadius: 999,
+                  border: "none",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  background: "#2563eb",
+                  color: "#e5e7eb",
+                }}
+              >
+                {copyStatus === "copied"
+                  ? "Copied ✅"
+                  : copyStatus === "error"
+                  ? "Copy failed"
+                  : "Copy Room Link"}
+              </button>
+
+              <button
+                onClick={leaveRoom}
+                disabled={leaving}
+                style={{
+                  width: "100%",
+                  marginTop: 10,
+                  padding: "10px 0",
+                  borderRadius: 999,
+                  border: "1px solid #374151",
+                  fontWeight: 700,
+                  cursor: leaving ? "not-allowed" : "pointer",
+                  background: "#0b1220",
+                  color: "#e5e7eb",
+                  opacity: leaving ? 0.7 : 1,
+                }}
+              >
+                {leaving ? "Leaving…" : "Leave"}
+              </button>
+
+              <div style={{ marginTop: 14, fontSize: 12, opacity: 0.75 }}>
+                If you used <strong>Find Game</strong>, someone will be routed
+                into this room automatically.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (breakpoint === "mobile") return <MobileLayout {...layoutProps} />;
   if (breakpoint === "tablet") return <TabletLayout {...layoutProps} />;
