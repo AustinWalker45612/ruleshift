@@ -1,5 +1,5 @@
 // src/components/PatcherView.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import type { Rule, RuleTemplate } from "../game/gameTypes";
 import { ActiveRulesPanel } from "./ActiveRulesPanel";
 
@@ -97,6 +97,20 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
 }) => {
   const isPhone = mode === "patcher";
 
+  /**
+   * We want "no default rule selected" when entering PatcherView.
+   * We keep props typed as RuleTemplate (to avoid ripples) but store
+   * "no selection" as an empty string via a cast.
+   */
+  useEffect(() => {
+    setSelectedTemplate("" as unknown as RuleTemplate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Treat selectedTemplate as a string for UI purposes (supports "").
+  const selected = (selectedTemplate as unknown as string) || "";
+  const hasSelectedTemplate = selected !== "";
+
   const inputStyle: React.CSSProperties = {
     width: "100%",
     boxSizing: "border-box",
@@ -136,6 +150,11 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
     whiteSpace: "nowrap",
     userSelect: "none",
   };
+
+  const canConfirm =
+    hasSelectedTemplate &&
+    patcherSecretCode.trim().length === 4 &&
+    !patcherRuleError;
 
   return (
     <div
@@ -180,7 +199,7 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
               }}
             >
               {quickTemplates.map((t) => {
-                const active = selectedTemplate === t.value;
+                const active = selected === t.value;
                 return (
                   <button
                     key={t.value}
@@ -205,11 +224,16 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
             New Rule Template:
             <select
               style={selectStyle}
-              value={selectedTemplate}
-              onChange={(e) =>
-                setSelectedTemplate(e.target.value as RuleTemplate)
-              }
+              value={selected}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                setSelectedTemplate(v as RuleTemplate);
+              }}
             >
+              <option value="" disabled>
+                Choose a template…
+              </option>
               {availableTemplateOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
@@ -219,8 +243,23 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
           </label>
 
           {/* === TEMPLATE CONFIG === */}
+          {!hasSelectedTemplate && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: 10,
+                borderRadius: 10,
+                border: "1px dashed #374151",
+                background: "#0b1220",
+                fontSize: 12,
+                opacity: 0.85,
+              }}
+            >
+              Pick a rule template to configure your new rule.
+            </div>
+          )}
 
-          {selectedTemplate === "positionEquals" && (
+          {selected === "positionEquals" && (
             <div style={{ fontSize: 13 }}>
               <label style={{ display: "block", marginBottom: 8 }}>
                 Position (1–4):
@@ -252,7 +291,7 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
             </div>
           )}
 
-          {selectedTemplate === "positionKind" && (
+          {selected === "positionKind" && (
             <div style={{ fontSize: 13 }}>
               <label style={{ display: "block", marginBottom: 8 }}>
                 Position (1–4):
@@ -285,7 +324,7 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
             </div>
           )}
 
-          {selectedTemplate === "exactLettersDigits" && (
+          {selected === "exactLettersDigits" && (
             <div style={{ fontSize: 13 }}>
               <p style={{ opacity: 0.8, marginBottom: 8 }}>
                 Letters + digits must always equal 4. Changing one updates the
@@ -304,12 +343,10 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
                   onChange={(e) => {
                     const raw = e.target.value.replace(/\D/g, "");
                     if (!raw) {
-                      // default 0 letters / 4 digits
                       setLettersCount(0);
                       setDigitsCount(4);
                       return;
                     }
-                    // take only last digit typed
                     let n = parseInt(raw[raw.length - 1], 10);
                     if (Number.isNaN(n)) n = 0;
                     if (n < 0) n = 0;
@@ -332,7 +369,6 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
                   onChange={(e) => {
                     const raw = e.target.value.replace(/\D/g, "");
                     if (!raw) {
-                      // default 4 digits / 0 letters
                       setDigitsCount(4);
                       setLettersCount(0);
                       return;
@@ -349,7 +385,7 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
             </div>
           )}
 
-          {selectedTemplate === "mustComeBefore" && (
+          {selected === "mustComeBefore" && (
             <div style={{ fontSize: 13 }}>
               <p style={{ opacity: 0.8, marginBottom: 8 }}>
                 If both characters appear in the code, the first must be before
@@ -382,19 +418,13 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
             </div>
           )}
 
-          {selectedTemplate === "allUnique" && (
-            <p
-              style={{
-                fontSize: 12,
-                opacity: 0.8,
-                marginTop: 4,
-              }}
-            >
+          {selected === "allUnique" && (
+            <p style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
               All 4 characters must be different. No repeats allowed.
             </p>
           )}
 
-          {selectedTemplate === "mustContainChar" && (
+          {selected === "mustContainChar" && (
             <div style={{ fontSize: 13 }}>
               <label style={{ display: "block" }}>
                 Character that must appear:
@@ -411,7 +441,7 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
             </div>
           )}
 
-          {selectedTemplate === "forbiddenChar" && (
+          {selected === "forbiddenChar" && (
             <div style={{ fontSize: 13 }}>
               <label style={{ display: "block" }}>
                 Character that cannot appear:
@@ -428,34 +458,22 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
             </div>
           )}
 
-          {selectedTemplate === "lettersInAlphabeticalOrder" && (
-            <p
-              style={{
-                fontSize: 12,
-                opacity: 0.8,
-                marginTop: 4,
-              }}
-            >
+          {selected === "lettersInAlphabeticalOrder" && (
+            <p style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
               Consider only letters (A–Z) in the code and ignore digits. Those
               letters must appear in non-decreasing alphabetical order.
             </p>
           )}
 
-          {selectedTemplate === "lettersNotInAlphabeticalOrder" && (
-            <p
-              style={{
-                fontSize: 12,
-                opacity: 0.8,
-                marginTop: 4,
-              }}
-            >
+          {selected === "lettersNotInAlphabeticalOrder" && (
+            <p style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
               Consider only letters (A–Z) in the code and ignore digits. Those
               letters must <strong>not</strong> all be in alphabetical order —
               there has to be at least one letter out of order.
             </p>
           )}
 
-          {selectedTemplate === "digitsLessThan" && (
+          {selected === "digitsLessThan" && (
             <div style={{ fontSize: 13 }}>
               <p style={{ opacity: 0.8, marginBottom: 8 }}>
                 Any digits in the code must be strictly less than the chosen
@@ -472,7 +490,6 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
                   onChange={(e) => {
                     const raw = e.target.value.replace(/\D/g, "");
                     if (!raw) {
-                      // default back to 1 if cleared
                       setMaxDigitValue(1);
                       return;
                     }
@@ -487,7 +504,7 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
             </div>
           )}
 
-          {selectedTemplate === "cannotBeAdjacent" && (
+          {selected === "cannotBeAdjacent" && (
             <div style={{ fontSize: 13 }}>
               <p style={{ opacity: 0.8, marginBottom: 8 }}>
                 If both characters appear in the code, they cannot be adjacent
@@ -520,72 +537,42 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
             </div>
           )}
 
-          {selectedTemplate === "adjacentLettersPair" && (
-            <p
-              style={{
-                fontSize: 12,
-                opacity: 0.8,
-                marginTop: 4,
-              }}
-            >
+          {selected === "adjacentLettersPair" && (
+            <p style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
               At least one pair of adjacent characters must both be letters
               (ignoring digits).
             </p>
           )}
 
-          {selectedTemplate === "lettersFirstHalf" && (
-            <p
-              style={{
-                fontSize: 12,
-                opacity: 0.8,
-                marginTop: 4,
-              }}
-            >
+          {selected === "lettersFirstHalf" && (
+            <p style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
               All letters must be in the range A–M. Digits are ignored by this
               rule.
             </p>
           )}
 
-          {selectedTemplate === "lettersSecondHalf" && (
-            <p
-              style={{
-                fontSize: 12,
-                opacity: 0.8,
-                marginTop: 4,
-              }}
-            >
+          {selected === "lettersSecondHalf" && (
+            <p style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
               All letters must be in the range N–Z. Digits are ignored by this
               rule.
             </p>
           )}
 
-          {selectedTemplate === "endsMirror" && (
-            <p
-              style={{
-                fontSize: 12,
-                opacity: 0.8,
-                marginTop: 4,
-              }}
-            >
+          {selected === "endsMirror" && (
+            <p style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
               The first and last characters of every valid code must match (e.g.
               A1B<strong>A</strong>, 3ZZ<strong>3</strong>).
             </p>
           )}
 
-          {selectedTemplate === "noAdjacentDuplicates" && (
-            <p
-              style={{
-                fontSize: 12,
-                opacity: 0.8,
-                marginTop: 4,
-              }}
-            >
+          {selected === "noAdjacentDuplicates" && (
+            <p style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
               No two adjacent characters can be the same (e.g. AA or 33 anywhere
               in the code is forbidden).
             </p>
           )}
 
-          {selectedTemplate === "exactDistinctCount" && (
+          {selected === "exactDistinctCount" && (
             <div style={{ fontSize: 13 }}>
               <p style={{ opacity: 0.8, marginBottom: 8 }}>
                 Controls how many different characters can appear in a code. For
@@ -646,6 +633,7 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
 
         <button
           onClick={handleConfirmPatcherSetup}
+          disabled={!canConfirm}
           style={{
             width: "100%",
             boxSizing: "border-box",
@@ -653,10 +641,16 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
             borderRadius: 999,
             border: "none",
             fontWeight: 600,
-            cursor: "pointer",
-            background: "#16a34a",
+            cursor: canConfirm ? "pointer" : "not-allowed",
+            background: canConfirm ? "#16a34a" : "#0f172a",
             color: "#e5e7eb",
+            opacity: canConfirm ? 1 : 0.7,
           }}
+          title={
+            canConfirm
+              ? "Confirm and pass to the Breaker"
+              : "Choose a rule template and enter a valid 4-character code"
+          }
         >
           Confirm &amp; Pass to Breaker
         </button>
