@@ -8,7 +8,6 @@ const cookieParser = require("cookie-parser");
 const { Server } = require("socket.io");
 const { matchmakeRouter } = require("./src/routes/matchmake.routes.cjs");
 
-
 // -------------------- Database --------------------
 // ✅ Adapter setup should export { prisma, pool }
 const { prisma, pool } = require("./src/db.cjs");
@@ -51,7 +50,6 @@ app.get("/debug/cookies", (req, res) => {
   });
 });
 
-
 // Routes
 app.use("/auth", authRouter);
 app.use("/stats", statsRouter);
@@ -79,8 +77,20 @@ function getOrCreateRoom(roomId) {
       roomId,
       state: null,
       seats: [
-        { clientId: null, socketId: null, connected: false, disconnectTimer: null, guestName: null },
-        { clientId: null, socketId: null, connected: false, disconnectTimer: null, guestName: null },
+        {
+          clientId: null,
+          socketId: null,
+          connected: false,
+          disconnectTimer: null,
+          guestName: null,
+        },
+        {
+          clientId: null,
+          socketId: null,
+          connected: false,
+          disconnectTimer: null,
+          guestName: null,
+        },
       ],
       spectators: new Map(), // clientId -> { socketId, connected, guestName }
       lastActivity: Date.now(),
@@ -196,6 +206,65 @@ io.on("connection", (socket) => {
     room.lastActivity = Date.now();
     socket.emit("room:joined", { roomId, clientId, seatIndex });
     broadcastPresence(roomId);
+  });
+
+  // ✅ NEW: explicit leave (used by your Waiting screen "Leave" button)
+  socket.on("room:leave", ({ roomId, clientId }) => {
+    if (!roomId || !clientId) return;
+
+    const rid = String(roomId).toUpperCase().trim();
+    const cid = String(clientId).trim();
+    const room = rooms.get(rid);
+    if (!room) return;
+
+    // Leave the Socket.IO room
+    try {
+      socket.leave(rid);
+    } catch {
+      // ignore
+    }
+
+    let changed = false;
+
+    // If this client occupies a seat, clear it immediately (and cancel timers)
+    room.seats.forEach((seat, idx) => {
+      if (seat.clientId === cid) {
+        if (seat.disconnectTimer) clearTimeout(seat.disconnectTimer);
+
+        room.seats[idx] = {
+          clientId: null,
+          socketId: null,
+          connected: false,
+          disconnectTimer: null,
+          guestName: null,
+        };
+        changed = true;
+      } else if (seat.socketId === socket.id) {
+        // Safety: if this socket was mapped but clientId doesn't match, detach socket
+        seat.connected = false;
+        seat.socketId = null;
+        changed = true;
+      }
+    });
+
+    // If they were a spectator, remove them
+    if (room.spectators.has(cid)) {
+      room.spectators.delete(cid);
+      changed = true;
+    } else {
+      // Safety: remove spectator entries tied to this socket id
+      for (const [specCid, spec] of room.spectators.entries()) {
+        if (spec.socketId === socket.id) {
+          room.spectators.delete(specCid);
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      room.lastActivity = Date.now();
+      broadcastPresence(rid);
+    }
   });
 
   socket.on("player:upsert", async ({ clientId, name }) => {
