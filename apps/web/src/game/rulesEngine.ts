@@ -14,11 +14,6 @@ export function passesAllRules(code: string, rules: Rule[]): boolean {
 
   for (const rule of rules) {
     switch (rule.type) {
-      case "positionEquals": {
-        const pos = rule.position;
-        if (code[pos] !== rule.char) return false;
-        break;
-      }
       case "positionKind": {
         const pos = rule.position;
         const ch = code[pos];
@@ -65,7 +60,6 @@ export function passesAllRules(code: string, rules: Rule[]): boolean {
         if (letters.length <= 1) break; // trivially in order
         for (let i = 1; i < letters.length; i++) {
           if (letters[i] < letters[i - 1]) {
-            // not in non-decreasing order => rule fails
             return false;
           }
         }
@@ -82,7 +76,7 @@ export function passesAllRules(code: string, rules: Rule[]): boolean {
             break;
           }
         }
-        if (nonDecreasing) return false; // all letters are in order, not allowed
+        if (nonDecreasing) return false;
         break;
       }
       case "digitsLessThan": {
@@ -166,9 +160,6 @@ export function isDuplicateRule(newRule: Rule, rules: Rule[]): boolean {
       return rules.some((r) => r.type === "allUnique");
     case "exactLettersDigits":
       return rules.some((r) => r.type === "exactLettersDigits");
-    case "positionEquals":
-      // Hard cap: only ONE positionEquals rule per duel.
-      return rules.some((r) => r.type === "positionEquals");
     case "positionKind":
       return rules.some(
         (r) =>

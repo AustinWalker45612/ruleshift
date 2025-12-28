@@ -154,54 +154,6 @@ const PatcherSetup: React.FC<PatcherSetupProps> = (props) => {
           </select>
         </label>
 
-        {/* Template-specific controls */}
-        {selectedTemplate === "positionEquals" && (
-          <div style={{ fontSize: 13 }}>
-            <label style={{ display: "block", marginBottom: 8 }}>
-              Position (1–4):
-              <select
-                style={{
-                  width: "100%",
-                  marginTop: 4,
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid #374151",
-                  background: "#020617",
-                  color: "#e5e7eb",
-                }}
-                value={positionIndex}
-                onChange={(e) =>
-                  setPositionIndex(Number(e.target.value) || 1)
-                }
-              >
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={3}>3</option>
-                <option value={4}>4</option>
-              </select>
-            </label>
-            <label style={{ display: "block" }}>
-              Required character (A–Z or 0–9):
-              <input
-                style={{
-                  width: "100%",
-                  marginTop: 4,
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid #374151",
-                  background: "#020617",
-                  color: "#e5e7eb",
-                  letterSpacing: 2,
-                }}
-                maxLength={1}
-                value={positionChar}
-                onChange={(e) => setPositionChar(e.target.value.toUpperCase())}
-                placeholder="e.g. A"
-              />
-            </label>
-          </div>
-        )}
-
         {selectedTemplate === "positionKind" && (
           <div style={{ fontSize: 13 }}>
             <label style={{ display: "block", marginBottom: 8 }}>

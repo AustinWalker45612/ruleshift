@@ -119,6 +119,12 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
   const breakpoint = useBreakpoint();
   const { user } = useAuth();
 
+  // ✅ Normalize roomId to match server (server uppercases roomId)
+  const normalizedRoomId = useMemo(
+    () => String(roomId || "").toUpperCase().trim(),
+    [roomId]
+  );
+
   const preferredDisplayName = useMemo(() => {
     const fromAuth = (user?.displayName || "").trim();
     if (fromAuth) return fromAuth;
@@ -158,9 +164,12 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
   );
   const [leaving, setLeaving] = useState(false);
 
+  // ✅ Prevent “Waiting…” flash before we’ve synced any state on refresh
+  const [hasSyncedState, setHasSyncedState] = useState(false);
+
   const handleCopyRoomLink = async () => {
-    if (typeof window === "undefined" || !roomId) return;
-    const url = `${window.location.origin}/room/${roomId}`;
+    if (typeof window === "undefined" || !normalizedRoomId) return;
+    const url = `${window.location.origin}/room/${normalizedRoomId}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopyStatus("copied");
@@ -180,14 +189,14 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     try {
       await apiFetch("/matchmake/leave", {
         method: "POST",
-        body: JSON.stringify({ roomId }),
+        body: JSON.stringify({ roomId: normalizedRoomId }),
       });
     } catch (e) {
       console.warn("matchmake/leave failed (ignored):", e);
     }
 
     try {
-      socket.emit("room:leave", { roomId, clientId });
+      socket.emit("room:leave", { roomId: normalizedRoomId, clientId });
     } catch {
       // ignore
     }
@@ -224,8 +233,10 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
   const [rules, setRules] = useState<Rule[]>([]);
   const [nextRuleId, setNextRuleId] = useState(1);
 
+  // ✅ Remove positionEquals usage: default to positionKind
   const [selectedTemplate, setSelectedTemplate] =
-    useState<RuleTemplate>("positionEquals");
+    useState<RuleTemplate>("positionKind");
+
   const [positionIndex, setPositionIndex] = useState<number>(1);
   const [positionChar, setPositionChar] = useState<string>("");
   const [positionKind, setPositionKind] = useState<"letter" | "digit">("letter");
@@ -357,11 +368,11 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
 
   // --- Socket: join room + seat assignment ---
   useEffect(() => {
-    if (!roomId) return;
+    if (!normalizedRoomId) return;
 
     // ✅ Send a name if available (login displayName preferred).
     const payload = {
-      roomId,
+      roomId: normalizedRoomId,
       clientId,
       mode: null, // keep shape compatible with server if it expects "mode"
       guestName: preferredDisplayName || "",
@@ -372,7 +383,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
 
     const handleJoined = (data: any) => {
       if (!data) return;
-      if (data.roomId !== roomId || data.clientId !== clientId) return;
+      if (data.roomId !== normalizedRoomId || data.clientId !== clientId) return;
 
       console.log("🎯 Received room:joined", data);
       const seatIndex =
@@ -385,14 +396,14 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     return () => {
       socket.off("room:joined", handleJoined);
     };
-  }, [roomId, clientId, preferredDisplayName]);
+  }, [normalizedRoomId, clientId, preferredDisplayName]);
 
   // --- Presence listener ---
   useEffect(() => {
-    if (!roomId) return;
+    if (!normalizedRoomId) return;
 
     const handlePresence = (data: RoomPresence) => {
-      if (!data || data.roomId !== roomId) return;
+      if (!data || data.roomId !== normalizedRoomId) return;
       setRoomPresence(data);
     };
 
@@ -400,7 +411,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     return () => {
       socket.off("room:presence", handlePresence);
     };
-  }, [roomId]);
+  }, [normalizedRoomId]);
 
   const occupiedSeatsCount = useMemo(() => {
     if (!roomPresence?.seats) return 0;
@@ -408,13 +419,15 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
   }, [roomPresence]);
 
   // Waiting UI: only when room has <2 players and we haven't started the duel yet
-  const waitingForOpponent = occupiedSeatsCount < 2 && phase === "enterNames";
+  // ✅ Gate behind hasSyncedState to prevent refresh flash
+  const waitingForOpponent =
+    hasSyncedState && occupiedSeatsCount < 2 && phase === "enterNames";
 
   const broadcastState = (overrides: Partial<SyncedState> = {}) => {
-    if (!roomId) return;
+    if (!normalizedRoomId) return;
 
     const payload: SyncedState = {
-      roomId,
+      roomId: normalizedRoomId,
       players,
       phase,
       currentPatcherIndex,
@@ -445,7 +458,10 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
   useEffect(() => {
     const handler = (remote: SyncedState) => {
       if (remote.sender && remote.sender === socket.id) return;
-      if (roomId && remote.roomId && remote.roomId !== roomId) return;
+      if (normalizedRoomId && remote.roomId && remote.roomId !== normalizedRoomId)
+        return;
+
+      setHasSyncedState(true);
 
       setPlayers(remote.players);
       setPhase(remote.phase);
@@ -479,15 +495,15 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     return () => {
       socket.off("game:state", handler);
     };
-  }, [roomId]);
+  }, [normalizedRoomId]);
 
   // --- On connect: request state ---
   useEffect(() => {
-    if (!roomId) return;
+    if (!normalizedRoomId) return;
 
     const requestState = () => {
-      console.log("🔄 Requesting latest game state for room:", roomId);
-      socket.emit("game:requestState", { roomId });
+      console.log("🔄 Requesting latest game state for room:", normalizedRoomId);
+      socket.emit("game:requestState", { roomId: normalizedRoomId });
     };
 
     if (socket.connected) requestState();
@@ -496,7 +512,14 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     return () => {
       socket.off("connect", requestState);
     };
-  }, [roomId]);
+  }, [normalizedRoomId]);
+
+  // ✅ Safety: if server doesn't send any state (fresh room), allow UI after short delay
+  useEffect(() => {
+    if (hasSyncedState) return;
+    const t = setTimeout(() => setHasSyncedState(true), 1200);
+    return () => clearTimeout(t);
+  }, [hasSyncedState]);
 
   // --- Prefill this seat's name from login displayName (preferred) or localStorage ---
   useEffect(() => {
@@ -582,7 +605,10 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     setBreakerError(null);
     setPatcherRuleError(null);
     setCurrentRoundGuesses([]);
-    setSelectedTemplate("positionEquals");
+
+    // ✅ default after removing positionEquals
+    setSelectedTemplate("positionKind");
+
     setPositionIndex(1);
     setPositionChar("");
     setPositionKind("letter");
@@ -664,27 +690,8 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     let description: string;
 
     switch (selectedTemplate) {
-      case "positionEquals": {
-        if (!CHAR_REGEX.test(positionChar)) {
-          alert(
-            'Choose a single letter or digit (A–Z or 0–9) for "Position must equal" rule.'
-          );
-          return;
-        }
-        if (positionIndex < 1 || positionIndex > 4) {
-          alert("Position must be between 1 and 4.");
-          return;
-        }
-        description = `Position ${positionIndex} must be "${positionChar}".`;
-        newRule = {
-          id: nextRuleId,
-          type: "positionEquals",
-          position: (positionIndex - 1) as 0 | 1 | 2 | 3,
-          char: positionChar,
-          description,
-        };
-        break;
-      }
+      // ✅ positionEquals removed
+
       case "positionKind": {
         if (positionIndex < 1 || positionIndex > 4) {
           alert("Position must be between 1 and 4.");
@@ -701,6 +708,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         };
         break;
       }
+
       case "exactLettersDigits": {
         if (
           lettersCount < 0 ||
@@ -725,6 +733,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         };
         break;
       }
+
       case "mustComeBefore": {
         const first = firstChar.toUpperCase();
         const second = secondChar.toUpperCase();
@@ -748,11 +757,13 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         };
         break;
       }
+
       case "allUnique": {
         description = "All 4 characters must be unique (no repeats).";
         newRule = { id: nextRuleId, type: "allUnique", description };
         break;
       }
+
       case "mustContainChar": {
         const c = mustContainChar.toUpperCase();
         if (!CHAR_REGEX.test(c)) {
@@ -770,6 +781,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         };
         break;
       }
+
       case "forbiddenChar": {
         const c = forbiddenChar.toUpperCase();
         if (!CHAR_REGEX.test(c)) {
@@ -787,6 +799,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         };
         break;
       }
+
       case "lettersInAlphabeticalOrder": {
         description =
           "All letters in the code must appear in alphabetical order (ignoring digits).";
@@ -797,6 +810,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         };
         break;
       }
+
       case "lettersNotInAlphabeticalOrder": {
         description =
           "The letters in the code cannot be in alphabetical order (ignoring digits).";
@@ -807,6 +821,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         };
         break;
       }
+
       case "digitsLessThan": {
         if (
           isNaN(maxDigitValue) ||
@@ -826,6 +841,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         };
         break;
       }
+
       case "cannotBeAdjacent": {
         const A = cannotAdjCharA.toUpperCase();
         const B = cannotAdjCharB.toUpperCase();
@@ -849,35 +865,41 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         };
         break;
       }
+
       case "adjacentLettersPair": {
         description =
           "At least one pair of adjacent characters must both be letters.";
         newRule = { id: nextRuleId, type: "adjacentLettersPair", description };
         break;
       }
+
       case "lettersFirstHalf": {
         description =
           "All letters in the code must be from the first half of the alphabet (A–M).";
         newRule = { id: nextRuleId, type: "lettersFirstHalf", description };
         break;
       }
+
       case "lettersSecondHalf": {
         description =
           "All letters in the code must be from the second half of the alphabet (N–Z).";
         newRule = { id: nextRuleId, type: "lettersSecondHalf", description };
         break;
       }
+
       case "endsMirror": {
         description =
           "The first and last characters of the code must be the same.";
         newRule = { id: nextRuleId, type: "endsMirror", description };
         break;
       }
+
       case "noAdjacentDuplicates": {
         description = "No two adjacent characters in the code can be identical.";
         newRule = { id: nextRuleId, type: "noAdjacentDuplicates", description };
         break;
       }
+
       case "exactDistinctCount": {
         if (
           isNaN(distinctCount) ||
@@ -897,6 +919,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
         };
         break;
       }
+
       default:
         return;
     }
@@ -1297,7 +1320,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
 
     const scoreEarned = playerScores[thisPlayerIndex] ?? 0;
 
-    const duelKey = `${roomId}:${rounds.length}:${phase}:${winnerIndex}`;
+    const duelKey = `${normalizedRoomId}:${rounds.length}:${phase}:${winnerIndex}`;
     if (reportedDuelRef.current === duelKey) return;
     reportedDuelRef.current = duelKey;
 
@@ -1317,7 +1340,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     playerSeat,
     thisPlayerIndex,
     playerScores,
-    roomId,
+    normalizedRoomId,
     rounds.length,
     currentBreakerIndex,
     currentPatcherIndex,
@@ -1325,7 +1348,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
 
   // Build props for layout components
   const layoutProps: LayoutProps = {
-    roomId,
+    roomId: normalizedRoomId,
     players,
     phase,
     currentRoundNumber,
@@ -1420,6 +1443,41 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     setTutorialMode,
   };
 
+  // ✅ Reconnecting guard (only if we truly haven't synced yet)
+  if (!hasSyncedState) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#0f172a",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 16,
+          color: "#e5e7eb",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 520,
+            background: "#111827",
+            borderRadius: 16,
+            border: "1px solid #1f2937",
+            padding: 20,
+            boxShadow: "0 16px 40px rgba(0,0,0,0.55)",
+          }}
+        >
+          <h2 style={{ margin: 0, marginBottom: 8 }}>Reconnecting…</h2>
+          <div style={{ fontSize: 13, opacity: 0.85 }}>
+            Syncing duel state for room{" "}
+            <strong style={{ letterSpacing: 2 }}>{normalizedRoomId}</strong>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ✅ Waiting screen (matchmaking-friendly)
   if (waitingForOpponent) {
     return (
@@ -1466,7 +1524,7 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
 
               <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 12 }}>
                 Room code:{" "}
-                <strong style={{ letterSpacing: 2 }}>{roomId}</strong>
+                <strong style={{ letterSpacing: 2 }}>{normalizedRoomId}</strong>
               </div>
 
               <button

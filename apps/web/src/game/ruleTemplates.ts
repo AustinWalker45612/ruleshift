@@ -8,10 +8,6 @@ export type TemplateOption = {
 
 export const templateOptions: TemplateOption[] = [
   {
-    value: "positionEquals",
-    label: "Position equals a specific character",
-  },
-  {
     value: "positionKind",
     label: "Position must be a letter or digit",
   },
@@ -103,7 +99,6 @@ export function getAvailableTemplateOptions(rules: Rule[]): TemplateOption[] {
   const hasEndsMirror = hasAny(rules, ["endsMirror"]);
   const hasNoAdjacentDuplicates = hasAny(rules, ["noAdjacentDuplicates"]);
   const hasExactLettersDigits = hasAny(rules, ["exactLettersDigits"]);
-  const hasPositionEquals = hasAny(rules, ["positionEquals"]);
   const hasAdjacentLettersPair = hasAny(rules, ["adjacentLettersPair"]);
 
   const distinctTooLowForPatterns =
@@ -113,9 +108,6 @@ export function getAvailableTemplateOptions(rules: Rule[]): TemplateOption[] {
     const t = opt.value;
 
     switch (t) {
-      case "positionEquals":
-        return !hasPositionEquals;
-
       // allUnique and exactDistinctCount are overlapping; don’t offer both.
       case "allUnique":
         if (hasAllUnique) return false;
@@ -141,7 +133,6 @@ export function getAvailableTemplateOptions(rules: Rule[]): TemplateOption[] {
         if (hasLettersHalfEither) return false;
         return true;
 
-      // 🔹 Updated per your request:
       // Hide if already present OR if allUnique is active (redundant).
       case "endsMirror":
         if (hasEndsMirror) return false;
@@ -161,7 +152,7 @@ export function getAvailableTemplateOptions(rules: Rule[]): TemplateOption[] {
         if (distinctTooLowForPatterns) return false;
         return true;
 
-      // exactLettersDigits compatibility (your rules):
+      // exactLettersDigits compatibility:
       // - digitsLessThan.maxDigit === 1 → effectively no digits allowed.
       // - exactDistinctCount < 3 → too cramped.
       case "exactLettersDigits":

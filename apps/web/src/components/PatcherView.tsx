@@ -128,7 +128,6 @@ export const PatcherView: React.FC<PatcherViewProps> = ({
   };
 
   const quickTemplates: Array<{ value: RuleTemplate; label: string }> = [
-    { value: "positionEquals", label: "Pos = _" },
     { value: "positionKind", label: "Pos is Letter/Digit" },
     { value: "mustContainChar", label: "Must contain _" },
     { value: "forbiddenChar", label: "Forbid _" },
