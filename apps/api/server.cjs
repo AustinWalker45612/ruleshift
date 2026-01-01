@@ -66,6 +66,156 @@ const io = new Server(server, {
   },
 });
 
+// -------------------- Name Moderation (server-side) --------------------
+/**
+ * Goal:
+ * - Hard rules: length + allowed chars + no URLs/emails + no excessive repeats
+ * - Blocklist: configurable (JSON file + env var)
+ * - Normalization: basic leetspeak + strip punctuation to catch obvious evasion
+ *
+ * NOTE: We do NOT ship any hate-speech list here. You provide it privately.
+ */
+
+function safeString(x) {
+  return typeof x === "string" ? x : x == null ? "" : String(x);
+}
+
+function collapseSpaces(s) {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function normalizeForMatch(s) {
+  // Lowercase, basic leet substitutions, remove non-alphanumerics.
+  const lower = s.toLowerCase();
+  const leet = lower
+    .replace(/[@]/g, "a")
+    .replace(/[4]/g, "a")
+    .replace(/[3]/g, "e")
+    .replace(/[1!|]/g, "i")
+    .replace(/[0]/g, "o")
+    .replace(/[5\$]/g, "s")
+    .replace(/[7]/g, "t");
+  return leet.replace(/[^a-z0-9]+/g, "");
+}
+
+function hashForLogs(s) {
+  // Lightweight non-crypto hash to avoid logging raw content
+  // (good enough for correlating repeated attempts)
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16);
+}
+
+function loadBannedTerms() {
+  const terms = new Set();
+
+  // 1) Optional JSON file: ./src/moderation/banned_name_terms.json
+  // format: { "terms": ["...", "..."] }  OR  ["...", "..."]
+  try {
+    // eslint-disable-next-line import/no-dynamic-require, global-require
+    const file = require("./src/moderation/banned_name_terms.json");
+    if (Array.isArray(file)) {
+      file.forEach((t) => terms.add(String(t).toLowerCase().trim()));
+    } else if (file && Array.isArray(file.terms)) {
+      file.terms.forEach((t) => terms.add(String(t).toLowerCase().trim()));
+    }
+  } catch {
+    // ignore if file not present
+  }
+
+  // 2) Optional env var BANNED_NAME_TERMS="a,b,c"
+  try {
+    const env = safeString(process.env.BANNED_NAME_TERMS);
+    if (env) {
+      env
+        .split(",")
+        .map((x) => x.trim().toLowerCase())
+        .filter(Boolean)
+        .forEach((t) => terms.add(t));
+    }
+  } catch {
+    // ignore
+  }
+
+  // Remove empties
+  terms.delete("");
+  return terms;
+}
+
+const BANNED_NAME_TERMS = loadBannedTerms();
+
+// structural rules (don’t allow anything weird)
+const NAME_MIN_LEN = Number(process.env.NAME_MIN_LEN || 2);
+const NAME_MAX_LEN = Number(process.env.NAME_MAX_LEN || 16);
+
+// Allow letters, numbers, spaces, underscore, dash, dot.
+// (Simple and safe. Expand later if you want unicode.)
+const ALLOWED_NAME_REGEX = /^[A-Za-z0-9._ -]+$/;
+
+function validatePlayerName(input) {
+  const raw = collapseSpaces(safeString(input));
+  if (!raw) return { ok: false, reason: "empty" };
+
+  if (raw.length < NAME_MIN_LEN) return { ok: false, reason: "too_short" };
+  if (raw.length > NAME_MAX_LEN) return { ok: false, reason: "too_long" };
+
+  if (!ALLOWED_NAME_REGEX.test(raw)) {
+    return { ok: false, reason: "invalid_chars" };
+  }
+
+  // Prevent obvious spam like "AAAAAAA" / "........"
+  if (/(.)\1\1\1/.test(raw)) {
+    return { ok: false, reason: "too_repetitive" };
+  }
+
+  // No URLs/emails
+  const lower = raw.toLowerCase();
+  if (lower.includes("http://") || lower.includes("https://") || lower.includes("www.")) {
+    return { ok: false, reason: "no_links" };
+  }
+  if (lower.includes("@")) {
+    return { ok: false, reason: "no_emails" };
+  }
+
+  // Blocklist check (normalized)
+  if (BANNED_NAME_TERMS.size > 0) {
+    const norm = normalizeForMatch(raw);
+    for (const term of BANNED_NAME_TERMS) {
+      if (!term) continue;
+      const normTerm = normalizeForMatch(term);
+      if (!normTerm) continue;
+      if (norm.includes(normTerm)) {
+        return { ok: false, reason: "blocked_term" };
+      }
+    }
+  }
+
+  return { ok: true, clean: raw };
+}
+
+function sanitizePlayersArray(players) {
+  if (!Array.isArray(players)) return players;
+
+  return players.map((p) => {
+    const name = p?.name;
+    const v = validatePlayerName(name);
+
+    // If invalid, blank it out rather than broadcasting toxicity.
+    // Client will still need to enter a valid name.
+    const safeName = v.ok ? v.clean : "";
+
+    return {
+      ...p,
+      name: safeName,
+      // If name is invalid, you are not "ready" (prevents auto-start issues)
+      ready: v.ok ? !!p?.ready : false,
+    };
+  });
+}
+
 // -------------------- Room Store --------------------
 const rooms = new Map();
 
@@ -161,8 +311,23 @@ io.on("connection", (socket) => {
 
     const roomId = String(payload.roomId).toUpperCase().trim();
     const clientId = String(payload.clientId).trim();
-    const guestName =
+
+    const rawGuestName =
       typeof payload.guestName === "string" ? payload.guestName.trim() : null;
+
+    // Validate guestName (best effort). If invalid, drop it and notify.
+    let guestName = null;
+    if (rawGuestName) {
+      const v = validatePlayerName(rawGuestName);
+      if (v.ok) {
+        guestName = v.clean;
+      } else {
+        console.warn(
+          `🚫 room:join rejected name hash=${hashForLogs(rawGuestName)} reason=${v.reason} room=${roomId}`
+        );
+        socket.emit("name:rejected", { reason: v.reason });
+      }
+    }
 
     const room = getOrCreateRoom(roomId);
     socket.join(roomId);
@@ -269,7 +434,16 @@ io.on("connection", (socket) => {
 
   socket.on("player:upsert", async ({ clientId, name }) => {
     try {
-      await upsertPlayer({ clientId, name });
+      const v = validatePlayerName(name);
+      if (!v.ok) {
+        console.warn(
+          `🚫 player:upsert rejected name hash=${hashForLogs(safeString(name))} reason=${v.reason}`
+        );
+        socket.emit("name:rejected", { reason: v.reason });
+        return;
+      }
+
+      await upsertPlayer({ clientId, name: v.clean });
     } catch (err) {
       console.error("player:upsert error:", err);
     }
@@ -281,13 +455,19 @@ io.on("connection", (socket) => {
     const roomId = String(payload.roomId).toUpperCase().trim();
     const room = getOrCreateRoom(roomId);
 
-    const cleanState = { ...payload };
+    // Sanitize any names inside players[] before storing + rebroadcasting
+    const cleanPayload = { ...payload };
+    if (cleanPayload.players) {
+      cleanPayload.players = sanitizePlayersArray(cleanPayload.players);
+    }
+
+    const cleanState = { ...cleanPayload };
     delete cleanState.sender;
 
     room.state = cleanState;
     room.lastActivity = Date.now();
 
-    socket.to(roomId).emit("game:state", { ...payload, sender: socket.id });
+    socket.to(roomId).emit("game:state", { ...cleanPayload, sender: socket.id });
   });
 
   socket.on("game:requestState", ({ roomId }) => {

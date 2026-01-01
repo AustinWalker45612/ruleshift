@@ -114,6 +114,55 @@ type GameRoomProps = {
   roomId: string; // comes from /room/:roomId route
 };
 
+// ---- Client-side name rules (UX only; server is source of truth) ----
+const NAME_MIN_LEN = 2;
+const NAME_MAX_LEN = 16;
+const ALLOWED_NAME_REGEX = /^[A-Za-z0-9._ -]+$/;
+
+function collapseSpaces(s: string) {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function validateNameClient(raw: string): { ok: boolean; reason?: string; clean?: string } {
+  const name = collapseSpaces(raw || "");
+  if (!name) return { ok: false, reason: "empty" };
+  if (name.length < NAME_MIN_LEN) return { ok: false, reason: "too_short" };
+  if (name.length > NAME_MAX_LEN) return { ok: false, reason: "too_long" };
+  if (!ALLOWED_NAME_REGEX.test(name)) return { ok: false, reason: "invalid_chars" };
+  if (/(.)\1\1\1/.test(name)) return { ok: false, reason: "too_repetitive" };
+
+  const lower = name.toLowerCase();
+  if (lower.includes("http://") || lower.includes("https://") || lower.includes("www.")) {
+    return { ok: false, reason: "no_links" };
+  }
+  if (lower.includes("@")) return { ok: false, reason: "no_emails" };
+
+  return { ok: true, clean: name };
+}
+
+function humanizeNameReason(reason?: string) {
+  switch (reason) {
+    case "empty":
+      return "Enter a name to continue.";
+    case "too_short":
+      return "Name is too short.";
+    case "too_long":
+      return "Name is too long.";
+    case "invalid_chars":
+      return "Use only letters, numbers, spaces, and . _ -";
+    case "too_repetitive":
+      return "Name looks spammy (too many repeated characters).";
+    case "no_links":
+      return "Links aren’t allowed in names.";
+    case "no_emails":
+      return "Emails aren’t allowed in names.";
+    case "blocked_term":
+      return "That name isn’t allowed. Try something else.";
+    default:
+      return "That name isn’t allowed. Try something else.";
+  }
+}
+
 const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
   const navigate = useNavigate();
   const breakpoint = useBreakpoint();
@@ -397,6 +446,28 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
       socket.off("room:joined", handleJoined);
     };
   }, [normalizedRoomId, clientId, preferredDisplayName]);
+
+  // --- Server rejection handler (name moderation) ---
+  useEffect(() => {
+    const onRejected = (data: any) => {
+      const reason = data?.reason;
+      alert(humanizeNameReason(reason));
+
+      // Force this seat to not-ready if we have a seat
+      setPlayers((prev) => {
+        if (playerSeat === null) return prev;
+        const updated: Player[] = [{ ...prev[0] }, { ...prev[1] }];
+        const current = updated[playerSeat];
+        updated[playerSeat] = { ...current, ready: false };
+        return updated;
+      });
+    };
+
+    socket.on("name:rejected", onRejected);
+    return () => {
+      socket.off("name:rejected", onRejected);
+    };
+  }, [playerSeat]);
 
   // --- Presence listener ---
   useEffect(() => {
@@ -690,8 +761,6 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
     let description: string;
 
     switch (selectedTemplate) {
-      // ✅ positionEquals removed
-
       case "positionKind": {
         if (positionIndex < 1 || positionIndex > 4) {
           alert("Position must be between 1 and 4.");
@@ -1259,21 +1328,28 @@ const GameRoom: React.FC<GameRoomProps> = ({ roomId }) => {
   const handleConfirmName = () => {
     if (isSpectator || playerSeat === null) return;
     const index = playerSeat;
-    const rawName = players[index].name.trim();
-    if (!rawName) return;
+    const rawName = players[index].name;
+
+    const v = validateNameClient(rawName);
+    if (!v.ok) {
+      alert(humanizeNameReason(v.reason));
+      return;
+    }
+
+    const clean = v.clean || rawName.trim();
 
     const updatedPlayers: Player[] = [{ ...players[0] }, { ...players[1] }];
     updatedPlayers[index] = {
       ...updatedPlayers[index],
-      name: rawName,
+      name: clean,
       ready: true,
     };
 
     setPlayers(updatedPlayers);
     broadcastState({ players: updatedPlayers });
 
-    console.log("🔔 Emitting player:upsert", { clientId, rawName });
-    socket.emit("player:upsert", { clientId, name: rawName });
+    console.log("🔔 Emitting player:upsert", { clientId, rawName: clean });
+    socket.emit("player:upsert", { clientId, name: clean });
   };
 
   const handleNameChange = (value: string) => {

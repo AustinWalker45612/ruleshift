@@ -64,8 +64,6 @@ const PatcherSetup: React.FC<PatcherSetupProps> = (props) => {
     availableTemplateOptions,
     positionIndex,
     setPositionIndex,
-    positionChar,
-    setPositionChar,
     positionKind,
     setPositionKind,
     lettersCount,
